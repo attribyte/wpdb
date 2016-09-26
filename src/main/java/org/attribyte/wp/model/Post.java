@@ -55,6 +55,11 @@ public class Post {
       PUBLISH,
 
       /**
+       * Status is inherited from the parent.
+       */
+      INHERIT,
+
+      /**
        * Post status is unknown.
        */
       UNKNOWN;
@@ -70,6 +75,7 @@ public class Post {
             case "pending" : return PENDING;
             case "private" : return PRIVATE;
             case "publish" : return PUBLISH;
+            case "inherit" : return INHERIT;
             default: return UNKNOWN;
          }
       }

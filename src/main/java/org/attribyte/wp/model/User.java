@@ -27,17 +27,29 @@ public class User {
     * @param id The unique id.
     * @param username The username.
     * @param displayName The display name.
+    * @param email The email.
     * @param createTimestamp The create timestamp.
     * @param metadata Associated metadata.
     */
    public User(final long id, final String username, final String displayName,
+               final String email,
                final long createTimestamp,
                final Collection<Meta> metadata) {
       this.id = id;
       this.username = username;
       this.displayName = displayName;
+      this.email = email;
       this.createTimestamp = createTimestamp;
       this.metadata = metadata != null ? ImmutableList.copyOf(metadata) : ImmutableList.of();
+   }
+
+   /**
+    * Creates a user with a new id.
+    * @param id The new id.
+    * @return The user with new id.
+    */
+   public User withId(final long id) {
+      return new User(id, username, displayName, email, createTimestamp, metadata);
    }
 
    /**
@@ -54,6 +66,11 @@ public class User {
     * The display name.
     */
    public final String displayName;
+
+   /**
+    * The email.
+    */
+   public final String email;
 
    /**
     * The time user was created.

@@ -37,12 +37,12 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
 import static org.attribyte.util.SQLUtil.closeQuietly;
+import static org.attribyte.wp.Util.slugify;
 
 public class DB {
 
@@ -526,6 +526,10 @@ public class DB {
 
    /**
     * Resolves a taxonomy term, creating if required.
+    * <p>
+    *    If taxonomy term cache is configured for this taxonomy, it
+    *    is used for resolution.
+    * </p>
     * @param taxonomy The taxonomy.
     * @param name The term name.
     * @return The taxonomy term.
@@ -543,14 +547,14 @@ public class DB {
       }
 
       term = selectTaxonomyTerm(taxonomy, name);
-      if(term != null) {
-         if(taxonomyTermCache != null) {
-            taxonomyTermCache.put(name, term);
-         }
-         return term;
-      } else {
-         return null; //TODO!!!
+      if(term == null) {
+         term = createTaxonomyTerm(taxonomy, name, slugify(name), "");
       }
+
+      if(taxonomyTermCache != null) {
+         taxonomyTermCache.put(name, term);
+      }
+      return term;
    }
 
    private final ConnectionSupplier connectionSupplier;

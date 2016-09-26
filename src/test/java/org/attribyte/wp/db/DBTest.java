@@ -47,7 +47,7 @@ public class DBTest {
          props.put("driver", "com.mysql.jdbc.Driver");
          props.put("host", "localhost");
          props.put("db", "wordpress_test");
-         _db = new DB(new SimpleConnectionSource(props), 1, ImmutableSet.of());
+         _db = new DB(new SimpleConnectionSource(props), 1, ImmutableSet.of("test_taxonomy_with_cache"));
       }
       return _db;
    }
@@ -133,6 +133,34 @@ public class DBTest {
       assertNotNull(db().selectTerm(term0.id));
 
       TaxonomyTerm matchTerm = db().selectTaxonomyTerm("test_taxonomy", termName);
+      assertNotNull(matchTerm);
+      assertEquals(term0.id, matchTerm.id);
+   }
+
+   @Test
+   public void resolveTaxonomyTerm() throws Exception {
+      String termName = StringUtil.randomString(8);
+      TaxonomyTerm term0 = db().resolveTaxonomyTerm("test_taxonomy", termName);
+      assertNotNull(term0);
+      assertTrue(term0.id > 0);
+      assertNotNull(term0.term);
+      assertNotNull(db().selectTerm(term0.id));
+
+      TaxonomyTerm matchTerm = db().selectTaxonomyTerm("test_taxonomy", termName);
+      assertNotNull(matchTerm);
+      assertEquals(term0.id, matchTerm.id);
+   }
+
+   @Test
+   public void resolveTaxonomyTermWithCache() throws Exception {
+      String termName = StringUtil.randomString(8);
+      TaxonomyTerm term0 = db().resolveTaxonomyTerm("test_taxonomy_with_cache", termName);
+      assertNotNull(term0);
+      assertTrue(term0.id > 0);
+      assertNotNull(term0.term);
+      assertNotNull(db().selectTerm(term0.id));
+
+      TaxonomyTerm matchTerm = db().resolveTaxonomyTerm("test_taxonomy_with_cache", termName);
       assertNotNull(matchTerm);
       assertEquals(term0.id, matchTerm.id);
    }

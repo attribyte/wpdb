@@ -13,6 +13,7 @@
  */
 
 package org.attribyte.wp.model;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 
 import java.util.Collection;
@@ -61,6 +62,14 @@ public class User {
     * The username.
     */
    public final String username;
+
+   /**
+    * The display name, if set, otherwise the username.
+    * @return The display name to use.
+    */
+   public final String displayName() {
+      return Strings.nullToEmpty(displayName).trim().isEmpty() ? username : displayName;
+   }
 
    /**
     * The display name.

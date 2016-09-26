@@ -32,7 +32,7 @@ public class Post {
    /**
     * Post status.
     */
-   public static enum Status {
+   public enum Status {
 
       /**
        * Post is a draft.
@@ -78,7 +78,7 @@ public class Post {
    /**
     * The post type.
     */
-   public static enum Type {
+   public enum Type {
 
       /**
        * Post is a regular post.
@@ -109,7 +109,7 @@ public class Post {
       }
    }
 
-   public static enum CommentStatus {
+   public enum CommentStatus {
 
       /**
        * Comments are open.
@@ -488,9 +488,7 @@ public class Post {
       public Post build() {
          ImmutableMap.Builder<String, ImmutableList<TaxonomyTerm>> builder = ImmutableMap.builder();
          if(taxonomyTerms != null && taxonomyTerms.size() > 0) {
-            taxonomyTerms.entrySet().forEach(kv -> {
-               builder.put(kv.getKey(), ImmutableList.copyOf(kv.getValue()));
-            });
+            taxonomyTerms.entrySet().forEach(kv -> builder.put(kv.getKey(), ImmutableList.copyOf(kv.getValue())));
          }
          return new Post(id, slug, title, excerpt, content, authorId, author,
                  publishTimestamp, modifiedTimestamp, status, parentId,
@@ -573,9 +571,7 @@ public class Post {
    public final Post withTaxonomyTerms(final Map<String, List<TaxonomyTerm>> taxonomyTerms) {
       ImmutableMap.Builder<String, ImmutableList<TaxonomyTerm>> builder = ImmutableMap.builder();
       if(taxonomyTerms != null && taxonomyTerms.size() > 0) {
-         taxonomyTerms.entrySet().forEach(kv -> {
-            builder.put(kv.getKey(), ImmutableList.copyOf(kv.getValue()));
-         });
+         taxonomyTerms.entrySet().forEach(kv -> builder.put(kv.getKey(), ImmutableList.copyOf(kv.getValue())));
       }
       return new Post(id, slug, title, excerpt, content, authorId, author,
               publishTimestamp, modifiedTimestamp, status, parentId,

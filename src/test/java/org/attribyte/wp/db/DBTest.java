@@ -21,10 +21,12 @@ import com.google.common.collect.Sets;
 import org.attribyte.api.InitializationException;
 import org.attribyte.util.StringUtil;
 import org.attribyte.wp.model.Meta;
+import org.attribyte.wp.model.Paging;
 import org.attribyte.wp.model.Post;
 import org.attribyte.wp.model.TaxonomyTerm;
 import org.attribyte.wp.model.Term;
 import org.attribyte.wp.model.User;
+import org.joda.time.Interval;
 import org.junit.Test;
 
 import java.util.List;
@@ -128,6 +130,34 @@ public class DBTest {
    }
 
    @Test
+   public void postPaging() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      db().deletePost(1001);
+      Post testPost = createTestPost(createdUser, 1001);
+      db().insertPost(testPost, TimeZone.getDefault());
+
+      List<Post> posts = db().selectPosts(Post.Type.POST, Post.Status.PUBLISH, Post.Sort.DESC, new Paging(0, 2), true);
+      assertNotNull(posts);
+      assertTrue(posts.size() > 0);
+   }
+
+   @Test
+   public void postPagingInterval() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      db().deletePost(1001);
+      Post testPost = createTestPost(createdUser, 1001);
+      db().insertPost(testPost, TimeZone.getDefault());
+      Interval interval = new Interval(0, System.currentTimeMillis() + 1000L);
+      List<Post> posts = db().selectPosts(Post.Type.POST, Post.Status.PUBLISH, Post.Sort.DESC, new Paging(0, 2, interval), true);
+      assertNotNull(posts);
+      assertTrue(posts.size() > 0);
+   }
+
+   @Test
    public void createTerm() throws Exception {
       String termName = StringUtil.randomString(8);
       Term term0 = db().createTerm(termName, "slug0-" + termName);
@@ -199,6 +229,7 @@ public class DBTest {
       builder.setPublishTimestamp(System.currentTimeMillis());
       builder.setModifiedTimestamp(System.currentTimeMillis());
       builder.setStatus(Post.Status.PUBLISH);
+      builder.setType(Post.Type.POST);
       return builder.build();
    }
 

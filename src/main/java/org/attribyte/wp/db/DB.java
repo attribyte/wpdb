@@ -25,6 +25,7 @@ import com.google.common.collect.Sets;
 import org.attribyte.sql.ConnectionSupplier;
 import org.attribyte.util.SQLUtil;
 import org.attribyte.wp.model.Meta;
+import org.attribyte.wp.model.Paging;
 import org.attribyte.wp.model.Post;
 import org.attribyte.wp.model.TaxonomyTerm;
 import org.attribyte.wp.model.Term;
@@ -348,6 +349,96 @@ public class DB {
       post.setGUID(Strings.emptyToNull(rs.getString(11)));
       post.setType(Post.Type.fromString(rs.getString(12)));
       return post;
+   }
+
+   /**
+    * Selects a page of posts with a specified type.
+    * @param type The post type.
+    * @param status The required post status.
+    * @param sort The page sort.
+    * @param paging The page range and interval.
+    * @param withResolve Should associated users, etc be resolved?
+    * @return The list of posts.
+    * @throws SQLException on database error.
+    */
+   public List<Post> selectPosts(final Post.Type type,
+                                 final Post.Status status,
+                                 final Post.Sort sort,
+                                 final Paging paging,
+                                 final boolean withResolve) throws SQLException {
+
+      if(paging.limit < 1 || paging.start < 0) {
+         return ImmutableList.of();
+      }
+
+      List<Post.Builder> builders = Lists.newArrayListWithExpectedSize(paging.limit < 1024 ? paging.limit : 1024);
+
+      StringBuilder sql = new StringBuilder(selectPostSQL);
+      sql.append(postsTableName);
+      sql.append(" WHERE post_type=? AND post_status=?");
+      if(paging.interval != null) {
+         sql.append(" AND post_date");
+         sql.append(paging.startIsOpen ? " >" : " >=");
+         sql.append("?");
+
+         sql.append(" AND post_date");
+         sql.append(paging.endIsOpen ? " <" : " <=");
+         sql.append("?");
+      }
+
+      switch(sort) {
+         case ASC:
+            sql.append(" ORDER BY post_date ASC");
+            break;
+         case ASC_MOD:
+            sql.append(" ORDER BY post_modified ASC");
+            break;
+         case DESC_MOD:
+            sql.append(" ORDER BY post_modified DESC");
+            break;
+         default:
+            sql.append(" ORDER BY post_date DESC");
+            break;
+      }
+
+      sql.append(" LIMIT ?,?");
+
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(sql.toString());
+         stmt.setString(1, type.toString().toLowerCase());
+         stmt.setString(2, status.toString().toLowerCase());
+         if(paging.interval != null) {
+            stmt.setTimestamp(3, new Timestamp(paging.interval.getStartMillis()));
+            stmt.setTimestamp(4, new Timestamp(paging.interval.getEndMillis()));
+            stmt.setInt(5, paging.start);
+            stmt.setInt(6, paging.limit);
+         } else {
+            stmt.setInt(3, paging.start);
+            stmt.setInt(4, paging.limit);
+         }
+         rs = stmt.executeQuery();
+         while(rs.next()) {
+            builders.add(postFromResultSet(rs));
+         }
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+
+      List<Post> posts = Lists.newArrayListWithExpectedSize(builders.size());
+      for(Post.Builder builder : builders) {
+         if(withResolve) {
+            posts.add(resolve(builder).build());
+         } else {
+            posts.add(builder.build());
+         }
+      }
+
+      return posts;
    }
 
    /**

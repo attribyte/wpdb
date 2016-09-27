@@ -147,6 +147,32 @@ public class Post {
    }
 
    /**
+    * Post sort methods.
+    */
+   public enum Sort {
+
+      /**
+       * Sort in ascending order by publish time.
+       */
+      ASC,
+
+      /**
+       * Sort in descending order by publish time.
+       */
+      DESC,
+
+      /**
+       * Sort in ascending order by last modified time.
+       */
+      ASC_MOD,
+
+      /**
+       * Sort in descending order by last modified time.
+       */
+      DESC_MOD
+   }
+
+   /**
     * Builds an immutable post.
     */
    public static class Builder {

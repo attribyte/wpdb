@@ -27,6 +27,7 @@ import org.attribyte.util.SQLUtil;
 import org.attribyte.wp.model.Meta;
 import org.attribyte.wp.model.Paging;
 import org.attribyte.wp.model.Post;
+import org.attribyte.wp.model.Site;
 import org.attribyte.wp.model.TaxonomyTerm;
 import org.attribyte.wp.model.Term;
 import org.attribyte.wp.model.User;
@@ -43,6 +44,7 @@ import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
 import static org.attribyte.util.SQLUtil.closeQuietly;
+import static org.attribyte.wp.Util.CATEGORY_TAXONOMY;
 import static org.attribyte.wp.Util.slugify;
 
 public class DB {
@@ -62,18 +64,19 @@ public class DB {
       final String postMetaTableName;
       final String termTaxonomyTableName;
       final String termsTableName;
+      final String optionsTableName;
 
       if(siteId < 2) {
          this.postsTableName = "wp_posts";
          postMetaTableName = "wp_postmeta";
-         this.optionsTableName = "wp_options";
+         optionsTableName = "wp_options";
          termsTableName = "wp_terms";
          termRelationshipsTableName = "wp_term_relationships";
          termTaxonomyTableName = "wp_term_taxonomy";
       } else {
          this.postsTableName = "wp_" + siteId + "_posts";
          postMetaTableName = "wp_" + siteId + "_postmeta";
-         this.optionsTableName = "wp_" + siteId + "_options";
+         optionsTableName = "wp_" + siteId + "_options";
          termsTableName = "wp_" + siteId + "_terms";
          termRelationshipsTableName = "wp_" + siteId + "_term_relationships";
          termTaxonomyTableName = "wp_" + siteId + "_term_taxonomy";
@@ -98,6 +101,7 @@ public class DB {
                  .build()
                  );
       }
+
       this.taxonomyTermCaches = taxonomyTermCachesBuilder.build();
 
       this.taxonomyTermCache = CacheBuilder.newBuilder()
@@ -134,6 +138,8 @@ public class DB {
       this.insertPostMetaSQL = "INSERT INTO " + postMetaTableName + "(post_id, meta_key, meta_value) VALUES (?,?,?)";
 
       this.deletePostMetaSQL = "DELETE FROM " + postMetaTableName + " WHERE post_id=?";
+
+      this.selectOptionSQL = "SELECT option_value FROM " + optionsTableName + " WHERE option_name=?";
    }
 
    private static final String createUserSQL =
@@ -152,12 +158,18 @@ public class DB {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
+
+      String nicename = user.displayName();
+      if(nicename.length() > 49) {
+         nicename = nicename.substring(0, 49);
+      }
+
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(createUserSQL, Statement.RETURN_GENERATED_KEYS);
          stmt.setString(1, user.username);
          stmt.setString(2, Strings.nullToEmpty(userPass));
-         stmt.setString(3, user.displayName());
+         stmt.setString(3, nicename);
          stmt.setString(4, user.displayName());
          stmt.setString(5, Strings.nullToEmpty(user.email));
          stmt.executeUpdate();
@@ -995,9 +1007,68 @@ public class DB {
       return terms;
    }
 
+   private final String selectOptionSQL;
+
+
+   /**
+    * Gets a configuration option.
+    * @param optionName The option name.
+    * @return The option value or {@code null} if not found.
+    * @throws SQLException on database error.
+    */
+   public String getOption(final String optionName) throws SQLException {
+      return getOption(optionName, null);
+   }
+
+   /**
+    * Gets a configuration option with a default value.
+    * @param optionName The option name.
+    * @param defaultValue A default value if no option is set.
+    * @return The option value or the default value if not found.
+    * @throws SQLException on database error.
+    */
+   public String getOption(final String optionName, final String defaultValue) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(selectOptionSQL);
+         stmt.setString(1, optionName);
+         rs = stmt.executeQuery();
+         if(rs.next()) {
+            String val = rs.getString(1);
+            return val != null ? val.trim() : defaultValue;
+         } else {
+            return defaultValue;
+         }
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+   }
+
+   /**
+    * Selects the site metadata from the options table.
+    * @return The site metadata.
+    * @throws SQLException on database error.
+    */
+   public Site selectSite(final long siteId) throws SQLException {
+      String baseURL = getOption("home");
+      String title = getOption("blogname");
+      String description = getOption("blogdescription");
+      String permalinkStructure = getOption("permalink_structure", "/?p=%postid%");
+      long defaultCategoryId = Long.parseLong(getOption("default_category", "0"));
+      TaxonomyTerm defaultCategoryTerm = resolveTaxonomyTerm(defaultCategoryId);
+      if(defaultCategoryTerm == null) {
+         defaultCategoryTerm = new TaxonomyTerm(0L, CATEGORY_TAXONOMY, new Term(0L, "Uncategorized", "uncategorized"), "");
+      }
+      return new Site(siteId, baseURL, title, description, permalinkStructure, defaultCategoryTerm.term);
+   }
+
+
    private final ConnectionSupplier connectionSupplier;
 
-   private final String optionsTableName;
    private final String postsTableName;
 
    private final Cache<Long, User> userCache;

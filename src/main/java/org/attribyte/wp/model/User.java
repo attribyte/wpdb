@@ -19,6 +19,8 @@ import com.google.common.collect.ImmutableList;
 import java.util.Collection;
 import java.util.List;
 
+import static org.attribyte.wp.Util.slugify;
+
 /**
  * An immutable user.
  */
@@ -43,6 +45,7 @@ public class User {
       this.email = email;
       this.createTimestamp = createTimestamp;
       this.metadata = metadata != null ? ImmutableList.copyOf(metadata) : ImmutableList.of();
+      this.slug = slugify(displayName);
    }
 
    /**
@@ -100,4 +103,9 @@ public class User {
     * Metadata associated with the user.
     */
    public final ImmutableList<Meta> metadata;
+
+   /**
+    * A slug for the author.
+    */
+   public final String slug;
 }

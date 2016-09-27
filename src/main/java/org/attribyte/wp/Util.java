@@ -17,6 +17,16 @@ package org.attribyte.wp;
 public class Util {
 
    /**
+    * The taxonomy for categories.
+    */
+   public static final String CATEGORY_TAXONOMY = "category";
+
+   /**
+    * The taxonomy for tags.
+    */
+   public static final String TAG_TAXONOMY = "post_tag";
+
+   /**
     * Creates a slug from a string.
     * <p>
     *    Does not strip markup.

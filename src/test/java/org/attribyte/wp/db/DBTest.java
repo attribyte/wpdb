@@ -180,4 +180,19 @@ public class DBTest {
       builder.setStatus(Post.Status.PUBLISH);
       return builder.build();
    }
+
+   @Test
+   public void postTags() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      db().deletePost(1002);
+      Post testPost = createTestPost(createdUser, 1002);
+      db().insertPost(testPost, TimeZone.getDefault());
+
+      db().setPostTerms(1002, "test_taxonomy", ImmutableList.of("tag1", "tag2"));
+      List<TaxonomyTerm> terms = db().selectPostTerms(1002, "test_taxonomy");
+      assertNotNull(terms);
+      assertEquals(2, terms.size());
+   }
 }

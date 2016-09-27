@@ -22,24 +22,29 @@ public class TaxonomyTerm {
    /**
     * Creates a term in a taxonomy with no parent.
     * @param id The id assigned to the term in the taxonomy.
+    * @param taxonomy The taxonomy.
     * @param term The term.
     * @param description The description as it appears in the taxonomy.
     */
-   public TaxonomyTerm(final long id, final Term term,
+   public TaxonomyTerm(final long id, final String taxonomy,
+                       final Term term,
                        final String description) {
-      this(id, term, description, 0L);
+      this(id, taxonomy, term, description, 0L);
    }
 
    /**
     * Creates a term in a taxonomy with a parent.
     * @param id The id assigned to the term in the taxonomy.
+    * @param taxonomy The taxonomy.
     * @param term The term.
     * @param description The description as it appears in the taxonomy.
     * @param parentId The parent id, if any.
     */
-   public TaxonomyTerm(final long id, final Term term,
+   public TaxonomyTerm(final long id, final String taxonomy,
+                       final Term term,
                        final String description, final long parentId) {
       this.id = id;
+      this.taxonomy = taxonomy;
       this.term = term;
       this.description = description;
       this.parentId = parentId;
@@ -51,6 +56,11 @@ public class TaxonomyTerm {
    public final long id;
 
    /**
+    * The taxonomy.
+    */
+   public final String taxonomy;
+
+   /**
     * The associated term.
     */
    public final Term term;
@@ -59,7 +69,6 @@ public class TaxonomyTerm {
     * The description of the term as it appears in the taxonomy.
     */
    public final String description;
-
 
    /**
     * The parent taxonomy id, if any.

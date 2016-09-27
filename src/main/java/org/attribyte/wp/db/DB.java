@@ -94,11 +94,24 @@ public class DB {
       }
       this.taxonomyTermCaches = taxonomyTermCachesBuilder.build();
 
+      this.taxonomyTermCache = CacheBuilder.newBuilder()
+              .concurrencyLevel(4)
+              .expireAfterWrite(30, TimeUnit.MINUTES)
+              .build();
+
       this.selectTermIdSQL = "SELECT name, slug FROM " + termsTableName + " WHERE term_id=?";
 
       this.selectTaxonomyTermSQL = "SELECT term_taxonomy_id," + termTaxonomyTableName + ".term_id, description " +
               "FROM " + termsTableName + "," + termTaxonomyTableName + " WHERE " + termsTableName + ".name=? " +
               "AND taxonomy=? AND " +termsTableName + ".term_id=" + termTaxonomyTableName + ".term_id";
+
+      this.selectTaxonomyTermIdSQL = "SELECT taxonomy, term_id, description FROM " + termTaxonomyTableName + " WHERE term_taxonomy_id=?";
+
+      this.clearPostTermsSQL = "DELETE FROM " + termRelationshipsTableName + " WHERE object_id=?";
+
+      this.insertPostTermSQL = "INSERT IGNORE INTO " + termRelationshipsTableName + " (object_id, term_taxonomy_id, term_order) VALUES (?,?,?)";
+
+      this.selectPostTermsSQL = "SELECT term_taxonomy_id FROM " + termRelationshipsTableName + " WHERE object_id=? ORDER BY term_order ASC";
    }
 
    private static final String createUserSQL =
@@ -487,7 +500,7 @@ public class DB {
       } finally {
          closeQuietly(conn, stmt, rs);
       }
-      return new TaxonomyTerm(taxonomyTermId, selectTerm(termId), description);
+      return new TaxonomyTerm(taxonomyTermId, taxonomy, selectTerm(termId), description);
    }
 
    /**
@@ -515,7 +528,7 @@ public class DB {
          stmt.executeUpdate();
          rs = stmt.getGeneratedKeys();
          if(rs.next()) {
-            return new TaxonomyTerm(rs.getLong(1), term, description);
+            return new TaxonomyTerm(rs.getLong(1), taxonomy, term, description);
          } else {
             throw new SQLException("Problem creating taxonomy term (no generated id)");
          }
@@ -557,6 +570,157 @@ public class DB {
       return term;
    }
 
+   private final String selectTaxonomyTermIdSQL;
+
+   /**
+    * Resolves a taxonomy term by id.
+    * <p>
+    *    Uses configured caches.
+    * </p>
+    * @param id The taxonomy term id.
+    * @return The resolved term or {@code null} if not found.
+    * @throws SQLException on database error.
+    */
+   public TaxonomyTerm resolveTaxonomyTerm(final long id) throws SQLException {
+
+      TaxonomyTerm term = taxonomyTermCache.getIfPresent(id);
+      if(term != null) {
+         return term;
+      }
+
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+      long termId = 0;
+      String taxonomy = "";
+      String description = "";
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(selectTaxonomyTermIdSQL);
+         stmt.setLong(1, id);
+         rs = stmt.executeQuery();
+         if(rs.next()) {
+            taxonomy = rs.getString(1);
+            termId = rs.getLong(2);
+            description = rs.getString(3);
+         }
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+
+      if(termId > 0) {
+         term = new TaxonomyTerm(id, taxonomy, selectTerm(termId), description);
+         taxonomyTermCache.put(id, term);
+         return term;
+      } else {
+         return null;
+      }
+   }
+
+   private final String clearPostTermsSQL;
+
+   /**
+    * Clears all terms associated with a post.
+    * @param postId The post id.
+    * @throws SQLException on database error.
+    */
+   public void clearPostTerms(final long postId) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(clearPostTermsSQL);
+         stmt.setLong(1, postId);
+         stmt.executeUpdate();
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt);
+      }
+   }
+
+   private final String insertPostTermSQL;
+
+   /**
+    * Sets terms associated with a post.
+    * <p>
+    *    Uses cache, if configured, to resolve.
+    * </p>
+    * @param postId The post id.
+    * @param taxonomy The taxonomy.
+    * @param terms A list of term names.
+    * @return The list of taxonomy terms.
+    * @throws SQLException on database error.
+    */
+   public List<TaxonomyTerm> setPostTerms(final long postId, final String taxonomy, final List<String> terms) throws SQLException {
+      clearPostTerms(postId);
+      if(terms == null || terms.size() == 0) {
+         return ImmutableList.of();
+      }
+
+      List<TaxonomyTerm> taxonomyTerms = Lists.newArrayListWithExpectedSize(terms.size());
+      for(String term : terms) {
+         taxonomyTerms.add(resolveTaxonomyTerm(taxonomy, term));
+      }
+
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(insertPostTermSQL);
+         int pos = 0;
+         for(TaxonomyTerm taxonomyTerm : taxonomyTerms) {
+            stmt.setLong(1, postId);
+            stmt.setLong(2, taxonomyTerm.id);
+            stmt.setInt(3, pos++);
+            stmt.executeUpdate();
+         }
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt);
+      }
+
+      return taxonomyTerms;
+   }
+
+   public final String selectPostTermsSQL;
+
+   /**
+    * Selects all terms associated with a post.
+    * @param postId The post id.
+    * @param taxonomy The taxonomy.
+    * @return The list of terms.
+    * @throws SQLException on database error.
+    */
+   public List<TaxonomyTerm> selectPostTerms(final long postId, final String taxonomy) throws SQLException {
+
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+      List<Long> termIds = Lists.newArrayListWithExpectedSize(8);
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(selectPostTermsSQL);
+         stmt.setLong(1, postId);
+         rs = stmt.executeQuery();
+         while(rs.next()) {
+            termIds.add(rs.getLong(1));
+         }
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+
+      if(termIds.size() == 0) {
+         return ImmutableList.of();
+      }
+
+      List<TaxonomyTerm> terms = Lists.newArrayListWithExpectedSize(termIds.size());
+      for(long termId : termIds) {
+         TaxonomyTerm term = resolveTaxonomyTerm(termId);
+         if(term != null && term.taxonomy.equals(taxonomy)) {
+            terms.add(term);
+         }
+      }
+      return terms;
+   }
+
    private final ConnectionSupplier connectionSupplier;
 
    private final String optionsTableName;
@@ -569,4 +733,5 @@ public class DB {
    private final Cache<Long, User> userCache;
    private final Cache<String, User> usernameCache;
    private final ImmutableMap<String, Cache<String, TaxonomyTerm>> taxonomyTermCaches;
+   private final Cache<Long, TaxonomyTerm> taxonomyTermCache;
 }

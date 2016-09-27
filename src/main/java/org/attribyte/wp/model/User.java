@@ -17,6 +17,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 
 import java.util.Collection;
+import java.util.List;
 
 /**
  * An immutable user.
@@ -50,6 +51,15 @@ public class User {
     * @return The user with new id.
     */
    public User withId(final long id) {
+      return new User(id, username, displayName, email, createTimestamp, metadata);
+   }
+
+   /**
+    * Creates a user with added metadata.
+    * @param meta The metadata.
+    * @return The user with metadata added.
+    */
+   public User withMetadata(final List<Meta> meta) {
       return new User(id, username, displayName, email, createTimestamp, metadata);
    }
 

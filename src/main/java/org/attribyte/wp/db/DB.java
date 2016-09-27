@@ -57,20 +57,25 @@ public class DB {
              final Set<String> cachedTaxonomies) {
       this.connectionSupplier = connectionSupplier;
 
+      final String termRelationshipsTableName;
+      final String postMetaTableName;
+      final String termTaxonomyTableName;
+      final String termsTableName;
+
       if(siteId < 2) {
          this.postsTableName = "wp_posts";
-         this.postMetaTableName = "wp_postmeta";
+         postMetaTableName = "wp_postmeta";
          this.optionsTableName = "wp_options";
-         this.termsTableName = "wp_terms";
-         this.termRelationshipsTableName = "wp_term_relationships";
-         this.termTaxonomyTableName = "wp_term_taxonomy";
+         termsTableName = "wp_terms";
+         termRelationshipsTableName = "wp_term_relationships";
+         termTaxonomyTableName = "wp_term_taxonomy";
       } else {
          this.postsTableName = "wp_" + siteId + "_posts";
-         this.postMetaTableName = "wp_" + siteId + "_postmeta";
+         postMetaTableName = "wp_" + siteId + "_postmeta";
          this.optionsTableName = "wp_" + siteId + "_options";
-         this.termsTableName = "wp_" + siteId + "_terms";
-         this.termRelationshipsTableName = "wp_" + siteId + "_term_relationships";
-         this.termTaxonomyTableName = "wp_" + siteId + "_term_taxonomy";
+         termsTableName = "wp_" + siteId + "_terms";
+         termRelationshipsTableName = "wp_" + siteId + "_term_relationships";
+         termTaxonomyTableName = "wp_" + siteId + "_term_taxonomy";
       }
 
       this.userCache = CacheBuilder.newBuilder()
@@ -99,7 +104,13 @@ public class DB {
               .expireAfterWrite(30, TimeUnit.MINUTES)
               .build();
 
+      this.deletePostIdSQL = "DELETE FROM " + postsTableName + " WHERE ID=?";
+
+      this.insertTermSQL = "INSERT INTO " + termsTableName + "(name, slug) VALUES (?, ?)";
+
       this.selectTermIdSQL = "SELECT name, slug FROM " + termsTableName + " WHERE term_id=?";
+
+      this.selectTermIdsSQL = "SELECT term_id FROM " + termsTableName + " WHERE name=?";
 
       this.selectTaxonomyTermSQL = "SELECT term_taxonomy_id," + termTaxonomyTableName + ".term_id, description " +
               "FROM " + termsTableName + "," + termTaxonomyTableName + " WHERE " + termsTableName + ".name=? " +
@@ -107,11 +118,21 @@ public class DB {
 
       this.selectTaxonomyTermIdSQL = "SELECT taxonomy, term_id, description FROM " + termTaxonomyTableName + " WHERE term_taxonomy_id=?";
 
+      this.insertTaxonomyTermSQL = "INSERT INTO " + termTaxonomyTableName + "(term_id, taxonomy, description) VALUES (?,?, ?)";
+
       this.clearPostTermsSQL = "DELETE FROM " + termRelationshipsTableName + " WHERE object_id=?";
+
+      this.clearPostTermSQL = "DELETE FROM " + termRelationshipsTableName + " WHERE object_id=? AND term_taxonomy_id=?";
 
       this.insertPostTermSQL = "INSERT IGNORE INTO " + termRelationshipsTableName + " (object_id, term_taxonomy_id, term_order) VALUES (?,?,?)";
 
       this.selectPostTermsSQL = "SELECT term_taxonomy_id FROM " + termRelationshipsTableName + " WHERE object_id=? ORDER BY term_order ASC";
+
+      this.selectPostMetaSQL = "SELECT meta_id, meta_key, meta_value FROM " + postMetaTableName + " WHERE post_id=?";
+
+      this.insertPostMetaSQL = "INSERT INTO " + postMetaTableName + "(post_id, meta_key, meta_value) VALUES (?,?,?)";
+
+      this.deletePostMetaSQL = "DELETE FROM " + postMetaTableName + " WHERE post_id=?";
    }
 
    private static final String createUserSQL =
@@ -253,7 +274,7 @@ public class DB {
       }
    }
 
-   private static final String selectUserMetaSQL = "SELECT umeta_id, meta_key, meta_value WHERE userId=?";
+   private static final String selectUserMetaSQL = "SELECT umeta_id, meta_key, meta_value FROM wp_usermeta WHERE user_id=?";
 
    /**
     * Selects metadata for a user.
@@ -281,6 +302,8 @@ public class DB {
       }
    }
 
+   private final String deletePostIdSQL;
+
    /**
     * Deletes a post with a specified id, including all associated metadata.
     * @param postId The post id.
@@ -292,7 +315,7 @@ public class DB {
       PreparedStatement stmt = null;
       try {
          conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement("DELETE FROM " + postsTableName + " WHERE ID=?");
+         stmt = conn.prepareStatement(deletePostIdSQL);
          stmt.setLong(1, postId);
          stmt.executeUpdate();
       } finally {
@@ -300,11 +323,86 @@ public class DB {
       }
    }
 
+   private static final String selectPostSQL =
+           "SELECT ID, post_author, post_date_gmt, post_content, post_title, post_excerpt, post_status, post_name, post_modified_gmt," +
+                   "post_parent, guid, post_type FROM ";
+
+   /**
+    * Builds a post from a result set.
+    * @param rs The result set.
+    * @return The post (builder).
+    * @throws SQLException on database error.
+    */
+   private Post.Builder postFromResultSet(final ResultSet rs) throws SQLException {
+      Post.Builder post = Post.newBuilder();
+      post.setId(rs.getLong(1));
+      post.setAuthorId(rs.getLong(2));
+      post.setPublishTimestamp(rs.getTimestamp(3).getTime());
+      post.setContent(Strings.emptyToNull(rs.getString(4)));
+      post.setTitle(Strings.emptyToNull(rs.getString(5)));
+      post.setExcerpt(Strings.emptyToNull(rs.getString(6)));
+      post.setStatus(Post.Status.fromString(rs.getString(7)));
+      post.setSlug(Strings.emptyToNull(rs.getString(8)));
+      post.setModifiedTimestamp(rs.getTimestamp(9).getTime());
+      post.setParentId(rs.getLong(10));
+      post.setGUID(Strings.emptyToNull(rs.getString(11)));
+      post.setType(Post.Type.fromString(rs.getString(12)));
+      return post;
+   }
+
+   /**
+    * Resolves user, author, terms and meta for a post.
+    * @param post The post builder.
+    * @return The builder with resolved items.
+    * @throws SQLException on database error.
+    */
+   public Post.Builder resolve(final Post.Builder post) throws SQLException {
+      User author = resolveUser(post.getAuthorId());
+      if(author != null) {
+         List<Meta> meta = userMetadata(post.getAuthorId());
+         if(meta.size() > 0) {
+            author = author.withMetadata(meta);
+         }
+         post.setAuthor(author);
+      }
+
+      List<Meta> meta = selectPostMeta(post.getId());
+      if(meta.size() > 0) {
+         post.setMetadata(meta);
+      }
+
+      List<TaxonomyTerm> terms = selectPostTerms(post.getId());
+      if(terms.size() > 0) {
+         post.setTaxonomyTerms(terms);
+      }
+      return post;
+   }
+
+   /**
+    * Selects a post by id.
+    * @param postId The post id.
+    * @return The post.
+    * @throws SQLException on database error.
+    */
+   public Post.Builder selectPost(final long postId) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(selectPostSQL + postsTableName + " WHERE ID=?");
+         stmt.setLong(1, postId);
+         rs = stmt.executeQuery();
+         return rs.next() ? postFromResultSet(rs) : null;
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+   }
+
    private static final String insertPostWithIdSQL =
            " (ID, post_author, post_date, post_date_gmt, post_content, post_title, " +
                    "post_excerpt, post_status, post_name, post_modified, post_modified_gmt," +
                    "post_parent, guid, post_type, to_ping, pinged, post_content_filtered) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, '','', '')";
-
 
    /**
     * Inserts a post.
@@ -339,6 +437,8 @@ public class DB {
       }
    }
 
+   private final String deletePostMetaSQL;
+
    /**
     * Clears all metadata for a post.
     * @param postId The post id.
@@ -349,13 +449,44 @@ public class DB {
       PreparedStatement stmt = null;
       try {
          conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement("DELETE FROM " + postMetaTableName + " WHERE post_id=?");
+         stmt = conn.prepareStatement(deletePostMetaSQL);
          stmt.setLong(1, postId);
          stmt.executeUpdate();
       } finally {
          SQLUtil.closeQuietly(conn, stmt);
       }
    }
+
+   private final String selectPostMetaSQL;
+
+   /**
+    * Selects metadata for a post.
+    * @param postId The post id.
+    * @return The metadata.
+    * @throws SQLException on database error.
+    */
+   public List<Meta> selectPostMeta(final long postId) throws SQLException {
+
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+      List<Meta> meta = Lists.newArrayListWithExpectedSize(8);
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(selectPostMetaSQL);
+         stmt.setLong(1, postId);
+         rs = stmt.executeQuery();
+         while(rs.next()) {
+            meta.add(new Meta(rs.getLong(1), rs.getString(2), rs.getString(3)));
+         }
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+
+      return meta;
+   }
+
+   final String insertPostMetaSQL;
 
    /**
     * Sets metadata for a post.
@@ -377,7 +508,7 @@ public class DB {
       PreparedStatement stmt = null;
       try {
          conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement("INSERT INTO " + postMetaTableName + "(post_id, meta_key, meta_value) VALUES (?,?,?)");
+         stmt = conn.prepareStatement(insertPostMetaSQL);
          for(Meta meta : postMeta) {
             stmt.setLong(1, postId);
             stmt.setString(2, meta.key);
@@ -388,6 +519,8 @@ public class DB {
          SQLUtil.closeQuietly(conn, stmt);
       }
    }
+
+   private final String selectTermIdsSQL;
 
    /**
     * Selects the term ids for all with the specified name.
@@ -403,7 +536,7 @@ public class DB {
       Set<Long> ids = Sets.newHashSetWithExpectedSize(4);
       try {
          conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement("SELECT term_id FROM " + termsTableName + " WHERE name=?");
+         stmt = conn.prepareStatement(selectTermIdsSQL);
          stmt.setString(1, name);
          rs = stmt.executeQuery();
          while(rs.next()) {
@@ -414,6 +547,8 @@ public class DB {
          SQLUtil.closeQuietly(conn, stmt, rs);
       }
    }
+
+   private final String insertTermSQL;
 
    /**
     * Creates a term.
@@ -429,7 +564,7 @@ public class DB {
       ResultSet rs = null;
       try {
          conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement("INSERT INTO " + termsTableName + "(name, slug) VALUES (?, ?)", Statement.RETURN_GENERATED_KEYS);
+         stmt = conn.prepareStatement(insertTermSQL, Statement.RETURN_GENERATED_KEYS);
          stmt.setString(1, name);
          stmt.setString(2, slug);
          stmt.executeUpdate();
@@ -503,6 +638,8 @@ public class DB {
       return new TaxonomyTerm(taxonomyTermId, taxonomy, selectTerm(termId), description);
    }
 
+   final String insertTaxonomyTermSQL;
+
    /**
     * Creates a taxonomy term.
     * @param taxonomy The taxonomy.
@@ -521,7 +658,7 @@ public class DB {
       ResultSet rs = null;
       try {
          conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement("INSERT INTO " + termTaxonomyTableName + "(term_id, taxonomy, description) VALUES (?,?, ?)", Statement.RETURN_GENERATED_KEYS);
+         stmt = conn.prepareStatement(insertTaxonomyTermSQL, Statement.RETURN_GENERATED_KEYS);
          stmt.setLong(1, term.id);
          stmt.setString(2, taxonomy);
          stmt.setString(3, Strings.nullToEmpty(description));
@@ -617,6 +754,28 @@ public class DB {
       }
    }
 
+   private final String clearPostTermSQL;
+
+   /**
+    * Clears a single taxonomy term associated with a post.
+    * @param postId The post id.
+    * @param taxonomyTermId The taxonomy term id.
+    * @throws SQLException on database error.
+    */
+   public void clearPostTerm(final long postId, final long taxonomyTermId) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(clearPostTermSQL);
+         stmt.setLong(1, postId);
+         stmt.setLong(2, taxonomyTermId);
+         stmt.executeUpdate();
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt);
+      }
+   }
+
    private final String clearPostTermsSQL;
 
    /**
@@ -637,10 +796,23 @@ public class DB {
       }
    }
 
+   /**
+    * Clears all terms associated with a post with a specified taxonomy.
+    * @param postId The post id.
+    * @param taxonomy The taxonomy.
+    * @throws SQLException on database error.
+    */
+   public void clearPostTerms(final long postId, final String taxonomy) throws SQLException {
+      List<TaxonomyTerm> terms = selectPostTerms(postId, taxonomy);
+      for(TaxonomyTerm term : terms) {
+         clearPostTerm(postId, term.id);
+      }
+   }
+
    private final String insertPostTermSQL;
 
    /**
-    * Sets terms associated with a post.
+    * Sets terms associated with a post, replacing any existing terms with the specified taxonomy.
     * <p>
     *    Uses cache, if configured, to resolve.
     * </p>
@@ -651,7 +823,7 @@ public class DB {
     * @throws SQLException on database error.
     */
    public List<TaxonomyTerm> setPostTerms(final long postId, final String taxonomy, final List<String> terms) throws SQLException {
-      clearPostTerms(postId);
+      clearPostTerms(postId, taxonomy);
       if(terms == null || terms.size() == 0) {
          return ImmutableList.of();
       }
@@ -683,9 +855,20 @@ public class DB {
    public final String selectPostTermsSQL;
 
    /**
+    * Selects all terms associated with a post for any taxonomy.
+    * @param postId The post id.
+    * @return The list of terms.
+    * @throws SQLException on database error.
+    */
+   public List<TaxonomyTerm> selectPostTerms(final long postId) throws SQLException {
+      return selectPostTerms(postId, null);
+   }
+
+
+   /**
     * Selects all terms associated with a post.
     * @param postId The post id.
-    * @param taxonomy The taxonomy.
+    * @param taxonomy The taxonomy. If {@code null}, any taxonomy is accepted.
     * @return The list of terms.
     * @throws SQLException on database error.
     */
@@ -714,7 +897,7 @@ public class DB {
       List<TaxonomyTerm> terms = Lists.newArrayListWithExpectedSize(termIds.size());
       for(long termId : termIds) {
          TaxonomyTerm term = resolveTaxonomyTerm(termId);
-         if(term != null && term.taxonomy.equals(taxonomy)) {
+         if(term != null && (taxonomy == null || term.taxonomy.equals(taxonomy))) {
             terms.add(term);
          }
       }
@@ -725,10 +908,6 @@ public class DB {
 
    private final String optionsTableName;
    private final String postsTableName;
-   private final String postMetaTableName;
-   private final String termsTableName;
-   private final String termRelationshipsTableName;
-   private final String termTaxonomyTableName;
 
    private final Cache<Long, User> userCache;
    private final Cache<String, User> usernameCache;

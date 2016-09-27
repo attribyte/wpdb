@@ -90,10 +90,13 @@ public class DBTest {
       db().deletePost(1000);
       Post testPost = createTestPost(createdUser, 1000);
       db().insertPost(testPost, TimeZone.getDefault());
+
+      Post.Builder insertedPost = db().selectPost(testPost.id);
+      assertNotNull(insertedPost);
    }
 
    @Test
-   public void insertPostWithMeta() throws Exception {
+   public void resolvePost() throws Exception {
       String username = StringUtil.randomString(8);
       User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
@@ -101,9 +104,27 @@ public class DBTest {
       Post testPost = createTestPost(createdUser, 1001);
       db().insertPost(testPost, TimeZone.getDefault());
       List<Meta> metaList = Lists.newArrayList();
-      metaList.add(new Meta(0L, "test0", "val0"));
-      metaList.add(new Meta(0L, "test1", "val1"));
+      metaList.add(new Meta(0L, "test0", "mval0"));
+      metaList.add(new Meta(0L, "test1", "mval1"));
       db().setPostMeta(1001, metaList);
+      db().setPostTerms(1001, "test_taxonomy", ImmutableList.of("term0", "term1"));
+
+      Post.Builder builder = db().selectPost(1001);
+      assertNotNull(builder);
+      Post post = db().resolve(builder).build();
+
+      assertNotNull(post.author);
+      assertEquals(createdUser.id, post.author.id);
+
+      assertNotNull(post.metadata);
+      assertEquals(2, post.metadata.size());
+
+      assertNotNull(post.taxonomyTerms);
+      assertEquals(1,post.taxonomyTerms.size());
+
+      List<TaxonomyTerm> terms = post.taxonomyTerms.get("test_taxonomy");
+      assertNotNull(terms);
+      assertEquals(2, terms.size());
    }
 
    @Test
@@ -182,7 +203,7 @@ public class DBTest {
    }
 
    @Test
-   public void postTags() throws Exception {
+   public void postTerms() throws Exception {
       String username = StringUtil.randomString(8);
       User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
@@ -194,5 +215,43 @@ public class DBTest {
       List<TaxonomyTerm> terms = db().selectPostTerms(1002, "test_taxonomy");
       assertNotNull(terms);
       assertEquals(2, terms.size());
+
+      db().clearPostTerms(1002);
+      terms = db().selectPostTerms(1002, "test_taxonomy");
+      assertNotNull(terms);
+      assertEquals(0, terms.size());
    }
+
+   @Test
+   public void postTermsCache() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      db().deletePost(1003);
+      Post testPost = createTestPost(createdUser, 1003);
+      db().insertPost(testPost, TimeZone.getDefault());
+
+      db().setPostTerms(1003, "test_taxonomy", ImmutableList.of("tag1", "tag2"));
+      db().setPostTerms(1003, "test_taxonomy_with_cache", ImmutableList.of("tag1", "tag4", "tag5"));
+
+      List<TaxonomyTerm> terms = db().selectPostTerms(1003, "test_taxonomy");
+      assertNotNull(terms);
+      assertEquals(2, terms.size());
+
+      terms = db().selectPostTerms(1003, "test_taxonomy_with_cache");
+      assertNotNull(terms);
+      assertEquals(3, terms.size());
+
+      terms = db().selectPostTerms(1003);
+      assertNotNull(terms);
+      assertEquals(5, terms.size());
+
+      db().clearPostTerms(1003, "test_taxonomy_with_cache");
+
+      terms = db().selectPostTerms(1003, "test_taxonomy"); //Verify all are not deleted with set.
+      assertNotNull(terms);
+      assertEquals(2, terms.size());
+
+   }
+
 }

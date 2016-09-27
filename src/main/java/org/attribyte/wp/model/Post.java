@@ -423,37 +423,37 @@ public class Post {
 
       /**
        * Sets terms for a taxonomy, replacing any existing.
-       * @param taxonomy The taxonomy.
        * @param terms The terms.
        * @return A self-reference.
        */
-      public Builder setTaxonomyTerms(final String taxonomy, final List<TaxonomyTerm> terms) {
+      public Builder setTaxonomyTerms(final List<TaxonomyTerm> terms) {
          if(taxonomyTerms == null) {
             taxonomyTerms = Maps.newHashMapWithExpectedSize(4);
+         } else {
+            taxonomyTerms.clear();
          }
 
-         if(terms == null || terms.size() == 0) {
-            taxonomyTerms.remove(taxonomy);
-         } else {
-            taxonomyTerms.put(taxonomy, terms);
+         if(terms != null) {
+            for(TaxonomyTerm term : terms) {
+               addTaxonomyTerm(term);
+            }
          }
          return this;
       }
 
       /**
        * Adds a taxonomy term.
-       * @param taxonomy The taxonomy.
        * @param term The term.
        * @return A self-reference.
        */
-      public Builder addTaxonomyTerm(final String taxonomy, final TaxonomyTerm term) {
+      public Builder addTaxonomyTerm(final TaxonomyTerm term) {
          if(taxonomyTerms == null) {
             taxonomyTerms = Maps.newLinkedHashMapWithExpectedSize(4);
          }
-         List<TaxonomyTerm> terms = taxonomyTerms.get(taxonomy);
+         List<TaxonomyTerm> terms = taxonomyTerms.get(term.taxonomy);
          if(terms == null) {
             terms = Lists.newArrayListWithExpectedSize(8);
-            taxonomyTerms.put(taxonomy, terms);
+            taxonomyTerms.put(term.taxonomy, terms);
          }
          terms.add(term);
          return this;

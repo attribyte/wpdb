@@ -24,6 +24,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
+import static org.attribyte.wp.Util.TAG_TAXONOMY;
+import static org.attribyte.wp.Util.CATEGORY_TAXONOMY;
+
 /**
  * An immutable post.
  */
@@ -700,4 +703,22 @@ public class Post {
     * A map of taxonomy terms vs taxonomy name.
     */
    public final ImmutableMap<String, ImmutableList<TaxonomyTerm>> taxonomyTerms;
+
+   /**
+    * An immutable list of tags associated with this post.
+    * @return The list of tags.
+    */
+   public final ImmutableList<TaxonomyTerm> tags() {
+      ImmutableList<TaxonomyTerm> tags = taxonomyTerms.get(TAG_TAXONOMY);
+      return tags != null ? tags : ImmutableList.of();
+   }
+
+   /**
+    * An immutable list of categories associated with this post.
+    * @return The list of categories.
+    */
+   public final ImmutableList<TaxonomyTerm> categories() {
+      ImmutableList<TaxonomyTerm> categories = taxonomyTerms.get(CATEGORY_TAXONOMY);
+      return categories != null ? categories : ImmutableList.of();
+   }
 }

@@ -15,6 +15,7 @@
 package org.attribyte.wp.db;
 
 
+import com.codahale.metrics.Meter;
 import com.codahale.metrics.Metric;
 import com.codahale.metrics.MetricSet;
 import com.google.common.base.Strings;
@@ -274,8 +275,10 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public User resolveUser(final long userId) throws SQLException {
+      userCacheTries.mark();
       User user = userCache.getIfPresent(userId);
       if(user != null) {
+         userCacheHits.mark();;
          return user;
       } else {
          user = selectUser(userId);
@@ -293,8 +296,10 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public User resolveUser(final String username) throws SQLException {
+      usernameCacheTries.mark();
       User user = usernameCache.getIfPresent(username);
       if(user != null) {
+         usernameCacheHits.mark();
          return user;
       } else {
          user = selectUser(username);
@@ -1388,7 +1393,6 @@ public class DB implements MetricSet {
       return new Site(siteId, baseURL, title, description, permalinkStructure, defaultCategoryTerm.term);
    }
 
-
    private final Timer optionSelectTimer = new Timer();
    private final Timer postTermsSelectTimer = new Timer();
    private final Timer postTermsSetTimer = new Timer();
@@ -1412,6 +1416,10 @@ public class DB implements MetricSet {
    private final Timer setPostMetaTimer = new Timer();
    private final Timer createTermTimer = new Timer();
    private final Timer selectTermTimer = new Timer();
+   private final Meter userCacheHits = new Meter();
+   private final Meter userCacheTries = new Meter();
+   private final Meter usernameCacheHits = new Meter();
+   private final Meter usernameCacheTries = new Meter();
 
    @Override
    public Map<String, Metric> getMetrics() {
@@ -1439,6 +1447,10 @@ public class DB implements MetricSet {
               .put("post-meta-select", selectPostMetaTimer)
               .put("term-create", createTermTimer)
               .put("term-select", selectTermTimer)
+              .put("user-cache-tries", userCacheTries)
+              .put("user-cache-hits", userCacheHits)
+              .put("username-cache-tries", usernameCacheTries)
+              .put("username-cache-hits", usernameCacheHits)
               .build();
    }
 

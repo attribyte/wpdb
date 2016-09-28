@@ -131,6 +131,19 @@ public class DBTest {
    }
 
    @Test
+   public void postSlug() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      Post testPost0 = createTestPost(createdUser, -1);
+      db().insertPost(testPost0, TimeZone.getDefault());
+
+      List<Post> posts = db().selectPosts(testPost0.slug, false);
+      assertNotNull(posts);
+      assertEquals(1, posts.size());
+   }
+
+   @Test
    public void postPaging() throws Exception {
       String username = StringUtil.randomString(8);
       User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());

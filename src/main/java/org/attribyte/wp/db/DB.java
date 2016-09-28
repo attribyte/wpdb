@@ -141,6 +141,8 @@ public class DB {
       this.deletePostMetaSQL = "DELETE FROM " + postMetaTableName + " WHERE post_id=?";
 
       this.selectOptionSQL = "SELECT option_value FROM " + optionsTableName + " WHERE option_name=?";
+
+      this.selectPostsBySlugSQL = selectPostSQL + this.postsTableName + " WHERE post_name=? ORDER BY ID DESC";
    }
 
    private static final String createUserSQL =
@@ -526,6 +528,51 @@ public class DB {
          }
       }
 
+      return posts;
+   }
+
+
+   private final String selectPostsBySlugSQL;
+
+   /**
+    * Selects all posts with a "slug".
+    * <p>
+    *    Ideally there should be just one, but this is not guaranteed
+    *    by the database.
+    * </p>
+    * @param slug The slug.
+    * @param withResolve Should associated users, etc be resolved?
+    * @return The list of matching posts.
+    * @throws SQLException on database error.
+    */
+   public List<Post> selectPosts(final String slug, final boolean withResolve) throws SQLException {
+
+      List<Post.Builder> builders = Lists.newArrayListWithExpectedSize(2);
+
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(selectPostsBySlugSQL);
+         stmt.setString(1, slug);
+         rs = stmt.executeQuery();
+         while(rs.next()) {
+            builders.add(postFromResultSet(rs));
+         }
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+
+      List<Post> posts = Lists.newArrayListWithExpectedSize(builders.size());
+      for(Post.Builder builder : builders) {
+         if(withResolve) {
+            posts.add(resolve(builder).build());
+         } else {
+            posts.add(builder.build());
+         }
+      }
       return posts;
    }
 

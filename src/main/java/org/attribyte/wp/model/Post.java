@@ -511,6 +511,24 @@ public class Post {
       }
 
       /**
+       * Gets the mime type.
+       * @return The mime type.
+       */
+      public String getMimeType() {
+         return mimeType;
+      }
+
+      /**
+       * Sets the mime type.
+       * @param mimeType The mime type.
+       * @return A self-reference;
+       */
+      public Builder setMimeType(final String mimeType) {
+         this.mimeType = mimeType;
+         return this;
+      }
+
+      /**
        * Creates an empty builder.
        */
       Builder() {
@@ -536,6 +554,7 @@ public class Post {
          this.commentCount = post.commentCount;
          this.metadata = post.metadata != null ? Lists.newArrayList(post.metadata) : Lists.newArrayList();
          this.type = post.type;
+         this.mimeType = post.mimeType;
       }
 
       /**
@@ -549,7 +568,7 @@ public class Post {
          }
          return new Post(id, slug, title, excerpt, content, authorId, author,
                  publishTimestamp, modifiedTimestamp, status, parentId,
-                 guid, commentCount, metadata, type, builder.build());
+                 guid, commentCount, metadata, type, mimeType, builder.build());
       }
 
       private long id;
@@ -567,6 +586,7 @@ public class Post {
       private int commentCount;
       private List<Meta> metadata;
       private Type type;
+      private String mimeType;
       private Map<String, List<TaxonomyTerm>> taxonomyTerms;
    }
 
@@ -590,7 +610,9 @@ public class Post {
    Post(final long id, final String slug, final String title, final String excerpt, final String content,
         final long authorId, final User author, final long publishTimestamp, final long modifiedTimestamp,
         final Status status, final long parentId, final String guid, final int commentCount,
-        final Collection<Meta> metadata, final Type type, final ImmutableMap<String, ImmutableList<TaxonomyTerm>> taxonomyTerms) {
+        final Collection<Meta> metadata, final Type type,
+        final String mimeType,
+        final ImmutableMap<String, ImmutableList<TaxonomyTerm>> taxonomyTerms) {
       this.id = id;
       this.slug = slug;
       this.title = title;
@@ -606,6 +628,7 @@ public class Post {
       this.commentCount = commentCount;
       this.metadata = metadata != null ? ImmutableList.copyOf(metadata) : ImmutableList.of();
       this.type = type;
+      this.mimeType = mimeType;
       this.taxonomyTerms = taxonomyTerms;
    }
 
@@ -617,7 +640,7 @@ public class Post {
    public final Post withAuthor(final User user) {
       return new Post(id, slug, title, excerpt, content, authorId, user,
               publishTimestamp, modifiedTimestamp, status, parentId,
-              guid, commentCount, metadata, type, taxonomyTerms);
+              guid, commentCount, metadata, type, mimeType, taxonomyTerms);
    }
 
    /**
@@ -632,7 +655,7 @@ public class Post {
       }
       return new Post(id, slug, title, excerpt, content, authorId, author,
               publishTimestamp, modifiedTimestamp, status, parentId,
-              guid, commentCount, metadata, type, builder.build());
+              guid, commentCount, metadata, type, mimeType, builder.build());
    }
 
    /**
@@ -643,7 +666,7 @@ public class Post {
    public final Post withMetadata(final List<Meta> metadata) {
       return new Post(id, slug, title, excerpt, content, authorId, author,
               publishTimestamp, modifiedTimestamp, status, parentId,
-              guid, commentCount, metadata, type, taxonomyTerms);
+              guid, commentCount, metadata, type, mimeType, taxonomyTerms);
    }
 
    /**
@@ -720,6 +743,11 @@ public class Post {
     * The post type.
     */
    public final Type type;
+
+   /**
+    * The mime type.
+    */
+   public final String mimeType;
 
    /**
     * A map of taxonomy terms vs taxonomy name.

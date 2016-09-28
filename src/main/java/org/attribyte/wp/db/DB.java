@@ -345,7 +345,7 @@ public class DB {
 
    private static final String selectPostSQL =
            "SELECT ID, post_author, post_date_gmt, post_content, post_title, post_excerpt, post_status, post_name, post_modified_gmt," +
-                   "post_parent, guid, post_type FROM ";
+                   "post_parent, guid, post_type, post_mime_type FROM ";
 
    /**
     * Builds a post from a result set.
@@ -367,6 +367,7 @@ public class DB {
       post.setParentId(rs.getLong(10));
       post.setGUID(Strings.emptyToNull(rs.getString(11)));
       post.setType(Post.Type.fromString(rs.getString(12)));
+      post.setMimeType(rs.getString(13));
       return post;
    }
 

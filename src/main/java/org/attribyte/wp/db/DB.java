@@ -144,7 +144,7 @@ public class DB {
 
       this.selectPostsBySlugSQL = selectPostSQL + this.postsTableName + " WHERE post_name=? ORDER BY ID DESC";
 
-      this.selectChildrenSQL = selectPostSQL + this.postsTableName + " WHERE parent_id=? ORDER BY ID DESC";
+      this.selectChildrenSQL = selectPostSQL + this.postsTableName + " WHERE post_parent=? ORDER BY ID DESC";
    }
 
    private static final String createUserSQL =
@@ -772,7 +772,7 @@ public class DB {
          stmt.setString(9, Strings.nullToEmpty(post.slug));
          stmt.setTimestamp(10, new Timestamp(post.modifiedTimestamp));
          stmt.setTimestamp(11, new Timestamp(post.modifiedTimestamp - offset));
-         stmt.setLong(12, 0);
+         stmt.setLong(12, post.parentId);
          stmt.setString(13, Strings.nullToEmpty(post.guid));
          stmt.setString(14, "post");
          stmt.executeUpdate();

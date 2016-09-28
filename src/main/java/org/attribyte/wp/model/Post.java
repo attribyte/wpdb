@@ -655,6 +655,17 @@ public class Post {
    }
 
    /**
+    * Adds a parent id to a post.
+    * @param parentId The parent id.
+    * @return The post with parent added.
+    */
+   public final Post withParent(final long parentId) {
+      return new Post(id, slug, title, excerpt, content, authorId, author,
+              publishTimestamp, modifiedTimestamp, status, parentId,
+              guid, commentCount, metadata, type, mimeType, taxonomyTerms, children);
+   }
+
+   /**
     * Adds an author to a post.
     * @param user The user that represents the author.
     * @return The post with author added.

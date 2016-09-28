@@ -93,9 +93,25 @@ public class DBTest {
       db().deletePost(1000);
       Post testPost = createTestPost(createdUser, 1000);
       db().insertPost(testPost, TimeZone.getDefault());
-
       Post.Builder insertedPost = db().selectPost(testPost.id);
       assertNotNull(insertedPost);
+   }
+
+   @Test
+   public void parentChild() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      Post testParent = createTestPost(createdUser, -1);
+      db().insertPost(testParent, TimeZone.getDefault());
+
+      Post testChild = createTestPost(createdUser, -1);
+      testChild = testChild.withParent(testParent.id);
+      db().insertPost(testChild, TimeZone.getDefault());
+
+      List<Post> children = db().selectChildren(testParent.id, false);
+      assertNotNull(children);
+      assertEquals(1, children.size());
    }
 
    @Test

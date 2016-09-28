@@ -165,10 +165,12 @@ public class DB {
          nicename = nicename.substring(0, 49);
       }
 
+      String username = user.username.length() < 60 ? user.username : user.username.substring(0, 60);
+
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(createUserSQL, Statement.RETURN_GENERATED_KEYS);
-         stmt.setString(1, user.username);
+         stmt.setString(1, username);
          stmt.setString(2, Strings.nullToEmpty(userPass));
          stmt.setString(3, nicename);
          stmt.setString(4, user.displayName());

@@ -27,6 +27,14 @@ public class Util {
    public static final String TAG_TAXONOMY = "post_tag";
 
    /**
+    * The key for featured images added as post metadata.
+    * <p>
+    *    Note: id maps to a post of type "attachment."
+    * </p>
+    */
+   public static final String FEATURED_IMAGE_KEY = "_thumbnail_id";
+
+   /**
     * Creates a slug from a string.
     * <p>
     *    Does not strip markup.

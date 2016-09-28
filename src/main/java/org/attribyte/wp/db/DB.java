@@ -38,6 +38,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.TimeZone;
@@ -61,7 +62,6 @@ public class DB {
       this.connectionSupplier = connectionSupplier;
       this.siteId = siteId;
 
-      final String termRelationshipsTableName;
       final String postMetaTableName;
       final String termTaxonomyTableName;
       final String termsTableName;
@@ -143,6 +143,8 @@ public class DB {
       this.selectOptionSQL = "SELECT option_value FROM " + optionsTableName + " WHERE option_name=?";
 
       this.selectPostsBySlugSQL = selectPostSQL + this.postsTableName + " WHERE post_name=? ORDER BY ID DESC";
+
+      this.getChildrenSQL = selectPostSQL + this.postsTableName + " WHERE parent_id=? ORDER BY ID DESC";
    }
 
    private static final String createUserSQL =
@@ -369,11 +371,11 @@ public class DB {
    }
 
    /**
-    * Selects a page of posts for an author, sorted by id.
+    * Selects a page of posts for an author.
     * @param userId The user id for the author.
     * @param sort The sort direction.
-    * @param paging The paging (range, if specified, is ignored).
-    * @param withResolve The associated users, etc be resolved?
+    * @param paging The paging.
+    * @param withResolve Should associated users, etc be resolved?
     * @return The list of posts.
     * @throws SQLException on database error.
     */
@@ -390,17 +392,8 @@ public class DB {
 
       StringBuilder sql = new StringBuilder(selectPostSQL);
       sql.append(postsTableName);
-      sql.append(" WHERE post_author=? ORDER BY ID ");
-      switch(sort) {
-         case ASC:
-         case ASC_MOD:
-         case ID_ASC:
-            sql.append("ASC");
-            break;
-         default:
-            sql.append("DESC");
-      }
-      sql.append(" LIMIT ?,?");
+      sql.append(" WHERE post_author=?");
+      appendPagingSortSQL(sql, sort, paging);
 
       Connection conn = null;
       PreparedStatement stmt = null;
@@ -410,8 +403,15 @@ public class DB {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(sql.toString());
          stmt.setLong(1, userId);
-         stmt.setInt(2, paging.start);
-         stmt.setInt(3, paging.limit);
+         if(paging.interval != null) {
+            stmt.setTimestamp(2, new Timestamp(paging.interval.getStartMillis()));
+            stmt.setTimestamp(3, new Timestamp(paging.interval.getStartMillis()));
+            stmt.setInt(4, paging.start);
+            stmt.setInt(5, paging.limit);
+         } else {
+            stmt.setInt(2, paging.start);
+            stmt.setInt(3, paging.limit);
+         }
          rs = stmt.executeQuery();
          while(rs.next()) {
             builders.add(postFromResultSet(rs));
@@ -457,41 +457,7 @@ public class DB {
       StringBuilder sql = new StringBuilder(selectPostSQL);
       sql.append(postsTableName);
       sql.append(" WHERE post_type=? AND post_status=?");
-      if(paging.interval != null) {
-         sql.append(" AND post_date");
-         sql.append(paging.startIsOpen ? " >" : " >=");
-         sql.append("?");
-
-         sql.append(" AND post_date");
-         sql.append(paging.endIsOpen ? " <" : " <=");
-         sql.append("?");
-      }
-
-      switch(sort) {
-         case ASC:
-            sql.append(" ORDER BY post_date ASC");
-            break;
-         case DESC:
-            sql.append(" ORDER BY post_date DESC");
-            break;
-         case ASC_MOD:
-            sql.append(" ORDER BY post_modified ASC");
-            break;
-         case DESC_MOD:
-            sql.append(" ORDER BY post_modified DESC");
-            break;
-         case ID_ASC:
-            sql.append(" ORDER BY ID ASC");
-            break;
-         case ID_DESC:
-            sql.append(" ORDER BY ID DESC");
-            break;
-         default:
-            sql.append(" ORDER BY post_date DESC");
-            break;
-      }
-
-      sql.append(" LIMIT ?,?");
+      appendPagingSortSQL(sql, sort, paging);
 
       Connection conn = null;
       PreparedStatement stmt = null;
@@ -531,6 +497,150 @@ public class DB {
       return posts;
    }
 
+   /**
+    * Selects a page of posts with a specified type.
+    * @param type The post type.
+    * @param status The required post status.
+    * @param sort The page sort.
+    * @param paging The page range and interval.
+    * @return The list of posts.
+    * @throws SQLException on database error.
+    */
+   public List<Long> selectPostIds(final Post.Type type,
+                                   final Post.Status status,
+                                   final Collection<TaxonomyTerm> terms,
+                                   final Post.Sort sort,
+                                   final Paging paging) throws SQLException {
+
+      if(paging.limit < 1 || paging.start < 0) {
+         return ImmutableList.of();
+      }
+
+      List<Long> ids = Lists.newArrayListWithExpectedSize(paging.limit < 1024 ? paging.limit : 1024);
+
+      StringBuilder sql = new StringBuilder("SELECT ID FROM ");
+      sql.append(postsTableName);
+      if(terms != null && terms.size() > 0) {
+         sql.append(",").append(termRelationshipsTableName);
+
+      }
+
+
+      sql.append(" WHERE post_type=? AND post_status=?");
+      appendPagingSortSQL(sql, sort, paging);
+
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(sql.toString());
+         stmt.setString(1, type.toString().toLowerCase());
+         stmt.setString(2, status.toString().toLowerCase());
+         if(paging.interval != null) {
+            stmt.setTimestamp(3, new Timestamp(paging.interval.getStartMillis()));
+            stmt.setTimestamp(4, new Timestamp(paging.interval.getEndMillis()));
+            stmt.setInt(5, paging.start);
+            stmt.setInt(6, paging.limit);
+         } else {
+            stmt.setInt(3, paging.start);
+            stmt.setInt(4, paging.limit);
+         }
+         rs = stmt.executeQuery();
+         while(rs.next()) {
+            ids.add(rs.getLong(1));
+         }
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+      return ids;
+   }
+
+   private final String getChildrenSQL;
+
+   /**
+    * Gets all children for a post.
+    * @param parentId The parent post id.
+    * @param withResolve Should associated users, etc be resolved?
+    * @return The list of children.
+    * @throws SQLException on database error.
+    */
+   public List<Post> getChildren(final long parentId, final boolean withResolve) throws SQLException {
+
+      List<Post.Builder> builders = Lists.newArrayListWithExpectedSize(4);
+
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(getChildrenSQL);
+         stmt.setLong(1, parentId);
+         rs = stmt.executeQuery();
+         while(rs.next()) {
+            builders.add(postFromResultSet(rs));
+         }
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+
+      List<Post> posts = Lists.newArrayListWithExpectedSize(builders.size());
+      for(Post.Builder builder : builders) {
+         if(withResolve) {
+            posts.add(resolve(builder).build());
+         } else {
+            posts.add(builder.build());
+         }
+      }
+
+      return posts;
+   }
+
+   /**
+    * Appends paging interval constraint, if required, paging and sort.
+    * @param sql The buffer to append to.
+    * @param sort The sort.
+    * @param paging The paging.
+    */
+   private void appendPagingSortSQL(final StringBuilder sql, final Post.Sort sort,final Paging paging) {
+
+      if(paging.interval != null) {
+         sql.append(" AND post_date");
+         sql.append(paging.startIsOpen ? " >" : " >=");
+         sql.append("?");
+
+         sql.append(" AND post_date");
+         sql.append(paging.endIsOpen ? " <" : " <=");
+         sql.append("?");
+      }
+
+      switch(sort) {
+         case ASC:
+            sql.append(" ORDER BY post_date ASC");
+            break;
+         case DESC:
+            sql.append(" ORDER BY post_date DESC");
+            break;
+         case ASC_MOD:
+            sql.append(" ORDER BY post_modified ASC");
+            break;
+         case DESC_MOD:
+            sql.append(" ORDER BY post_modified DESC");
+            break;
+         case ID_ASC:
+            sql.append(" ORDER BY ID ASC");
+            break;
+         case ID_DESC:
+            sql.append(" ORDER BY ID DESC");
+            break;
+         default:
+            sql.append(" ORDER BY post_date DESC");
+            break;
+      }
+      sql.append(" LIMIT ?,?");
+   }
 
    private final String selectPostsBySlugSQL;
 
@@ -575,6 +685,7 @@ public class DB {
       }
       return posts;
    }
+
 
    /**
     * Resolves user, author, terms and meta for a post.
@@ -1196,6 +1307,7 @@ public class DB {
 
    private final ConnectionSupplier connectionSupplier;
    private final String postsTableName;
+   private final String termRelationshipsTableName;
    private final Cache<Long, User> userCache;
    private final Cache<String, User> usernameCache;
    private final ImmutableMap<String, Cache<String, TaxonomyTerm>> taxonomyTermCaches;

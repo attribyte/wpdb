@@ -15,6 +15,8 @@
 package org.attribyte.wp.db;
 
 
+import com.codahale.metrics.Metric;
+import com.codahale.metrics.MetricSet;
 import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -22,6 +24,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import org.attribyte.essem.metrics.Timer;
 import org.attribyte.sql.ConnectionSupplier;
 import org.attribyte.util.SQLUtil;
 import org.attribyte.wp.model.Meta;
@@ -41,6 +44,7 @@ import java.sql.Timestamp;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
@@ -49,7 +53,7 @@ import static org.attribyte.util.SQLUtil.closeQuietly;
 import static org.attribyte.wp.Util.CATEGORY_TAXONOMY;
 import static org.attribyte.wp.Util.slugify;
 
-public class DB {
+public class DB implements MetricSet {
 
    /**
     * Creates a database with a connection supplier.
@@ -172,6 +176,7 @@ public class DB {
 
       String username = user.username.length() < 60 ? user.username : user.username.substring(0, 60);
 
+      Timer.Context ctx = createUserTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(createUserSQL, Statement.RETURN_GENERATED_KEYS);
@@ -188,6 +193,7 @@ public class DB {
             throw new SQLException("Problem creating user (no generated id)");
          }
       } finally {
+         ctx.stop();
          closeQuietly(conn, stmt, rs);
       }
    }
@@ -223,6 +229,7 @@ public class DB {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
+      Timer.Context ctx = selectUserTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectUserByUsernameSQL);
@@ -230,6 +237,7 @@ public class DB {
          rs = stmt.executeQuery();
          return rs.next() ? userFromResultSet(rs) : null;
       } finally {
+         ctx.stop();
          SQLUtil.closeQuietly(conn, stmt, rs);
       }
    }
@@ -246,6 +254,7 @@ public class DB {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
+      Timer.Context ctx = selectUserTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectUserByIdSQL);
@@ -253,6 +262,7 @@ public class DB {
          rs = stmt.executeQuery();
          return rs.next() ? userFromResultSet(rs) : null;
       } finally {
+         ctx.stop();
          SQLUtil.closeQuietly(conn, stmt, rs);
       }
    }
@@ -309,6 +319,7 @@ public class DB {
       PreparedStatement stmt = null;
       ResultSet rs = null;
       List<Meta> meta = Lists.newArrayListWithExpectedSize(16);
+      Timer.Context ctx = userMetadataTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectUserMetaSQL);
@@ -319,6 +330,7 @@ public class DB {
          }
          return meta;
       } finally {
+         ctx.stop();
          SQLUtil.closeQuietly(conn, stmt, rs);
       }
    }
@@ -334,12 +346,14 @@ public class DB {
       clearPostMeta(postId);
       Connection conn = null;
       PreparedStatement stmt = null;
+      Timer.Context ctx = deletePostTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(deletePostIdSQL);
          stmt.setLong(1, postId);
          stmt.executeUpdate();
       } finally {
+         ctx.stop();
          SQLUtil.closeQuietly(conn, stmt);
       }
    }
@@ -400,7 +414,7 @@ public class DB {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-
+      Timer.Context ctx = selectAuthorPostsTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(sql.toString());
@@ -419,6 +433,7 @@ public class DB {
             builders.add(postFromResultSet(rs));
          }
       } finally {
+         ctx.stop();
          SQLUtil.closeQuietly(conn, stmt, rs);
       }
 
@@ -464,7 +479,7 @@ public class DB {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-
+      Timer.Context ctx = selectPostsTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(sql.toString());
@@ -484,6 +499,7 @@ public class DB {
             builders.add(postFromResultSet(rs));
          }
       } finally {
+         ctx.stop();
          SQLUtil.closeQuietly(conn, stmt, rs);
       }
 
@@ -545,7 +561,7 @@ public class DB {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-
+      Timer.Context ctx = selectPostIdsTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(sql.toString());
@@ -565,6 +581,7 @@ public class DB {
             ids.add(rs.getLong(1));
          }
       } finally {
+         ctx.stop();
          SQLUtil.closeQuietly(conn, stmt, rs);
       }
       return ids;
@@ -586,7 +603,7 @@ public class DB {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-
+      Timer.Context ctx = selectChildrenTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectChildrenSQL);
@@ -596,6 +613,7 @@ public class DB {
             builders.add(postFromResultSet(rs));
          }
       } finally {
+         ctx.stop();
          SQLUtil.closeQuietly(conn, stmt, rs);
       }
 
@@ -675,6 +693,7 @@ public class DB {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
+      Timer.Context ctx = selectSlugPostsTimer.time();
 
       try {
          conn = connectionSupplier.getConnection();
@@ -685,6 +704,7 @@ public class DB {
             builders.add(postFromResultSet(rs));
          }
       } finally {
+         ctx.stop();
          SQLUtil.closeQuietly(conn, stmt, rs);
       }
 
@@ -744,6 +764,7 @@ public class DB {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
+      Timer.Context ctx = selectPostTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectPostSQL + postsTableName + " WHERE ID=?");
@@ -751,6 +772,7 @@ public class DB {
          rs = stmt.executeQuery();
          return rs.next() ? postFromResultSet(rs) : null;
       } finally {
+         ctx.stop();
          SQLUtil.closeQuietly(conn, stmt, rs);
       }
    }
@@ -770,6 +792,7 @@ public class DB {
       int offset = tz.getOffset(post.publishTimestamp);
       Connection conn = null;
       PreparedStatement stmt = null;
+      Timer.Context ctx = insertPostTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement("INSERT INTO " + postsTableName + insertPostWithIdSQL);
@@ -789,6 +812,7 @@ public class DB {
          stmt.setString(14, "post");
          stmt.executeUpdate();
       } finally {
+         ctx.stop();
          SQLUtil.closeQuietly(conn, stmt);
       }
    }
@@ -803,12 +827,14 @@ public class DB {
    public void clearPostMeta(final long postId) throws SQLException {
       Connection conn = null;
       PreparedStatement stmt = null;
+      Timer.Context ctx = clearPostMetaTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(deletePostMetaSQL);
          stmt.setLong(1, postId);
          stmt.executeUpdate();
       } finally {
+         ctx.stop();
          SQLUtil.closeQuietly(conn, stmt);
       }
    }
@@ -827,6 +853,7 @@ public class DB {
       PreparedStatement stmt = null;
       ResultSet rs = null;
       List<Meta> meta = Lists.newArrayListWithExpectedSize(8);
+      Timer.Context ctx = selectPostMetaTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectPostMetaSQL);
@@ -836,6 +863,7 @@ public class DB {
             meta.add(new Meta(rs.getLong(1), rs.getString(2), rs.getString(3)));
          }
       } finally {
+         ctx.stop();
          SQLUtil.closeQuietly(conn, stmt, rs);
       }
 
@@ -862,6 +890,7 @@ public class DB {
       }
       Connection conn = null;
       PreparedStatement stmt = null;
+      Timer.Context ctx = setPostMetaTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(insertPostMetaSQL);
@@ -872,6 +901,7 @@ public class DB {
             stmt.executeUpdate();
          }
       } finally {
+         ctx.stop();
          SQLUtil.closeQuietly(conn, stmt);
       }
    }
@@ -918,6 +948,7 @@ public class DB {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
+      Timer.Context ctx = createTermTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(insertTermSQL, Statement.RETURN_GENERATED_KEYS);
@@ -931,6 +962,7 @@ public class DB {
             throw new SQLException("Problem creating term (no generated id)");
          }
       } finally {
+         ctx.stop();
          closeQuietly(conn, stmt, rs);
       }
    }
@@ -947,6 +979,7 @@ public class DB {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
+      Timer.Context ctx = selectTermTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectTermIdSQL);
@@ -954,6 +987,7 @@ public class DB {
          rs = stmt.executeQuery();
          return rs.next() ? new Term(id, rs.getString(1), rs.getString(2)) : null;
       } finally {
+         ctx.stop();
          closeQuietly(conn, stmt, rs);
       }
    }
@@ -975,6 +1009,7 @@ public class DB {
       long taxonomyTermId = 0L;
       long termId = 0L;
       String description = "";
+      Timer.Context ctx = selectTaxonomyTermTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectTaxonomyTermSQL);
@@ -989,6 +1024,7 @@ public class DB {
             return null;
          }
       } finally {
+         ctx.stop();
          closeQuietly(conn, stmt, rs);
       }
       return new TaxonomyTerm(taxonomyTermId, taxonomy, selectTerm(termId), description);
@@ -1012,6 +1048,7 @@ public class DB {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
+      Timer.Context ctx = createTaxonomyTermTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(insertTaxonomyTermSQL, Statement.RETURN_GENERATED_KEYS);
@@ -1026,6 +1063,7 @@ public class DB {
             throw new SQLException("Problem creating taxonomy term (no generated id)");
          }
       } finally {
+         ctx.stop();
          closeQuietly(conn, stmt, rs);
       }
    }
@@ -1081,6 +1119,7 @@ public class DB {
          return term;
       }
 
+      Timer.Context ctx = taxonomyTermResolveTimer.time();
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
@@ -1098,6 +1137,7 @@ public class DB {
             description = rs.getString(3);
          }
       } finally {
+         ctx.stop();
          SQLUtil.closeQuietly(conn, stmt, rs);
       }
 
@@ -1119,16 +1159,21 @@ public class DB {
     * @throws SQLException on database error.
     */
    public void clearPostTerm(final long postId, final long taxonomyTermId) throws SQLException {
-      Connection conn = null;
-      PreparedStatement stmt = null;
+      Timer.Context ctx = postTermsClearTimer.time();
       try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(clearPostTermSQL);
-         stmt.setLong(1, postId);
-         stmt.setLong(2, taxonomyTermId);
-         stmt.executeUpdate();
+         Connection conn = null;
+         PreparedStatement stmt = null;
+         try {
+            conn = connectionSupplier.getConnection();
+            stmt = conn.prepareStatement(clearPostTermSQL);
+            stmt.setLong(1, postId);
+            stmt.setLong(2, taxonomyTermId);
+            stmt.executeUpdate();
+         } finally {
+            SQLUtil.closeQuietly(conn, stmt);
+         }
       } finally {
-         SQLUtil.closeQuietly(conn, stmt);
+         ctx.stop();
       }
    }
 
@@ -1140,15 +1185,20 @@ public class DB {
     * @throws SQLException on database error.
     */
    public void clearPostTerms(final long postId) throws SQLException {
-      Connection conn = null;
-      PreparedStatement stmt = null;
+      Timer.Context ctx = postTermsClearTimer.time();
       try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(clearPostTermsSQL);
-         stmt.setLong(1, postId);
-         stmt.executeUpdate();
+         Connection conn = null;
+         PreparedStatement stmt = null;
+         try {
+            conn = connectionSupplier.getConnection();
+            stmt = conn.prepareStatement(clearPostTermsSQL);
+            stmt.setLong(1, postId);
+            stmt.executeUpdate();
+         } finally {
+            SQLUtil.closeQuietly(conn, stmt);
+         }
       } finally {
-         SQLUtil.closeQuietly(conn, stmt);
+         ctx.stop();
       }
    }
 
@@ -1179,33 +1229,40 @@ public class DB {
     * @throws SQLException on database error.
     */
    public List<TaxonomyTerm> setPostTerms(final long postId, final String taxonomy, final List<String> terms) throws SQLException {
-      clearPostTerms(postId, taxonomy);
-      if(terms == null || terms.size() == 0) {
-         return ImmutableList.of();
-      }
 
-      List<TaxonomyTerm> taxonomyTerms = Lists.newArrayListWithExpectedSize(terms.size());
-      for(String term : terms) {
-         taxonomyTerms.add(resolveTaxonomyTerm(taxonomy, term));
-      }
+      Timer.Context ctx = postTermsSetTimer.time();
 
-      Connection conn = null;
-      PreparedStatement stmt = null;
       try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(insertPostTermSQL);
-         int pos = 0;
-         for(TaxonomyTerm taxonomyTerm : taxonomyTerms) {
-            stmt.setLong(1, postId);
-            stmt.setLong(2, taxonomyTerm.id);
-            stmt.setInt(3, pos++);
-            stmt.executeUpdate();
+         clearPostTerms(postId, taxonomy);
+         if(terms == null || terms.size() == 0) {
+            return ImmutableList.of();
          }
-      } finally {
-         SQLUtil.closeQuietly(conn, stmt);
-      }
 
-      return taxonomyTerms;
+         List<TaxonomyTerm> taxonomyTerms = Lists.newArrayListWithExpectedSize(terms.size());
+         for(String term : terms) {
+            taxonomyTerms.add(resolveTaxonomyTerm(taxonomy, term));
+         }
+
+         Connection conn = null;
+         PreparedStatement stmt = null;
+         try {
+            conn = connectionSupplier.getConnection();
+            stmt = conn.prepareStatement(insertPostTermSQL);
+            int pos = 0;
+            for(TaxonomyTerm taxonomyTerm : taxonomyTerms) {
+               stmt.setLong(1, postId);
+               stmt.setLong(2, taxonomyTerm.id);
+               stmt.setInt(3, pos++);
+               stmt.executeUpdate();
+            }
+         } finally {
+            SQLUtil.closeQuietly(conn, stmt);
+         }
+
+         return taxonomyTerms;
+      } finally {
+         ctx.stop();
+      }
    }
 
    public final String selectPostTermsSQL;
@@ -1230,34 +1287,40 @@ public class DB {
     */
    public List<TaxonomyTerm> selectPostTerms(final long postId, final String taxonomy) throws SQLException {
 
-      Connection conn = null;
-      PreparedStatement stmt = null;
-      ResultSet rs = null;
-      List<Long> termIds = Lists.newArrayListWithExpectedSize(8);
+      Timer.Context ctx = postTermsSelectTimer.time();
+
       try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(selectPostTermsSQL);
-         stmt.setLong(1, postId);
-         rs = stmt.executeQuery();
-         while(rs.next()) {
-            termIds.add(rs.getLong(1));
+         Connection conn = null;
+         PreparedStatement stmt = null;
+         ResultSet rs = null;
+         List<Long> termIds = Lists.newArrayListWithExpectedSize(8);
+         try {
+            conn = connectionSupplier.getConnection();
+            stmt = conn.prepareStatement(selectPostTermsSQL);
+            stmt.setLong(1, postId);
+            rs = stmt.executeQuery();
+            while(rs.next()) {
+               termIds.add(rs.getLong(1));
+            }
+         } finally {
+            SQLUtil.closeQuietly(conn, stmt, rs);
          }
+
+         if(termIds.size() == 0) {
+            return ImmutableList.of();
+         }
+
+         List<TaxonomyTerm> terms = Lists.newArrayListWithExpectedSize(termIds.size());
+         for(long termId : termIds) {
+            TaxonomyTerm term = resolveTaxonomyTerm(termId);
+            if(term != null && (taxonomy == null || term.taxonomy.equals(taxonomy))) {
+               terms.add(term);
+            }
+         }
+         return terms;
       } finally {
-         SQLUtil.closeQuietly(conn, stmt, rs);
+         ctx.stop();
       }
-
-      if(termIds.size() == 0) {
-         return ImmutableList.of();
-      }
-
-      List<TaxonomyTerm> terms = Lists.newArrayListWithExpectedSize(termIds.size());
-      for(long termId : termIds) {
-         TaxonomyTerm term = resolveTaxonomyTerm(termId);
-         if(term != null && (taxonomy == null || term.taxonomy.equals(taxonomy))) {
-            terms.add(term);
-         }
-      }
-      return terms;
    }
 
    private final String selectOptionSQL;
@@ -1269,8 +1332,8 @@ public class DB {
     * @return The option value or {@code null} if not found.
     * @throws SQLException on database error.
     */
-   public String getOption(final String optionName) throws SQLException {
-      return getOption(optionName, null);
+   public String selectOption(final String optionName) throws SQLException {
+      return selectOption(optionName, null);
    }
 
    /**
@@ -1280,24 +1343,30 @@ public class DB {
     * @return The option value or the default value if not found.
     * @throws SQLException on database error.
     */
-   public String getOption(final String optionName, final String defaultValue) throws SQLException {
-      Connection conn = null;
-      PreparedStatement stmt = null;
-      ResultSet rs = null;
+   public String selectOption(final String optionName, final String defaultValue) throws SQLException {
+
+      Timer.Context ctx = optionSelectTimer.time();
 
       try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(selectOptionSQL);
-         stmt.setString(1, optionName);
-         rs = stmt.executeQuery();
-         if(rs.next()) {
-            String val = rs.getString(1);
-            return val != null ? val.trim() : defaultValue;
-         } else {
-            return defaultValue;
+         Connection conn = null;
+         PreparedStatement stmt = null;
+         ResultSet rs = null;
+         try {
+            conn = connectionSupplier.getConnection();
+            stmt = conn.prepareStatement(selectOptionSQL);
+            stmt.setString(1, optionName);
+            rs = stmt.executeQuery();
+            if(rs.next()) {
+               String val = rs.getString(1);
+               return val != null ? val.trim() : defaultValue;
+            } else {
+               return defaultValue;
+            }
+         } finally {
+            SQLUtil.closeQuietly(conn, stmt, rs);
          }
       } finally {
-         SQLUtil.closeQuietly(conn, stmt, rs);
+         ctx.stop();
       }
    }
 
@@ -1307,16 +1376,70 @@ public class DB {
     * @throws SQLException on database error.
     */
    public Site selectSite() throws SQLException {
-      String baseURL = getOption("home");
-      String title = getOption("blogname");
-      String description = getOption("blogdescription");
-      String permalinkStructure = getOption("permalink_structure", "/?p=%postid%");
-      long defaultCategoryId = Long.parseLong(getOption("default_category", "0"));
+      String baseURL = selectOption("home");
+      String title = selectOption("blogname");
+      String description = selectOption("blogdescription");
+      String permalinkStructure = selectOption("permalink_structure", "/?p=%postid%");
+      long defaultCategoryId = Long.parseLong(selectOption("default_category", "0"));
       TaxonomyTerm defaultCategoryTerm = resolveTaxonomyTerm(defaultCategoryId);
       if(defaultCategoryTerm == null) {
          defaultCategoryTerm = new TaxonomyTerm(0L, CATEGORY_TAXONOMY, new Term(0L, "Uncategorized", "uncategorized"), "");
       }
       return new Site(siteId, baseURL, title, description, permalinkStructure, defaultCategoryTerm.term);
+   }
+
+
+   private final Timer optionSelectTimer = new Timer();
+   private final Timer postTermsSelectTimer = new Timer();
+   private final Timer postTermsSetTimer = new Timer();
+   private final Timer postTermsClearTimer = new Timer();
+   private final Timer taxonomyTermResolveTimer = new Timer();
+   private final Timer selectTaxonomyTermTimer = new Timer();
+   private final Timer createTaxonomyTermTimer = new Timer();
+   private final Timer createUserTimer = new Timer();
+   private final Timer selectUserTimer = new Timer();
+   private final Timer userMetadataTimer = new Timer();
+   private final Timer deletePostTimer = new Timer();
+   private final Timer selectAuthorPostsTimer = new Timer();
+   private final Timer selectPostsTimer = new Timer();
+   private final Timer selectPostIdsTimer = new Timer();
+   private final Timer selectChildrenTimer = new Timer();
+   private final Timer selectSlugPostsTimer = new Timer();
+   private final Timer selectPostTimer = new Timer();
+   private final Timer insertPostTimer = new Timer();
+   private final Timer clearPostMetaTimer = new Timer();
+   private final Timer selectPostMetaTimer = new Timer();
+   private final Timer setPostMetaTimer = new Timer();
+   private final Timer createTermTimer = new Timer();
+   private final Timer selectTermTimer = new Timer();
+
+   @Override
+   public Map<String, Metric> getMetrics() {
+      return ImmutableMap.<String, Metric>builder()
+              .put("option-select", optionSelectTimer)
+              .put("post-terms-select", postTermsSelectTimer)
+              .put("post-terms-set", postTermsSetTimer)
+              .put("post-terms-clear", postTermsClearTimer)
+              .put("taxonomy-term-resolve", taxonomyTermResolveTimer)
+              .put("taxonomy-term-select", selectTaxonomyTermTimer)
+              .put("taxonomy-term-create", createTaxonomyTermTimer)
+              .put("user-create", createUserTimer)
+              .put("user-select", selectUserTimer)
+              .put("user-metadata", userMetadataTimer)
+              .put("delete-post", deletePostTimer)
+              .put("author-posts-select", selectAuthorPostsTimer)
+              .put("posts-select", selectPostsTimer)
+              .put("post-ids-select", selectPostIdsTimer)
+              .put("post-children-select", selectChildrenTimer)
+              .put("slug-post-select", selectSlugPostsTimer)
+              .put("post-select", selectPostTimer)
+              .put("post-insert", insertPostTimer)
+              .put("pos-meta-set", setPostMetaTimer)
+              .put("post-meta-clear", clearPostMetaTimer)
+              .put("post-meta-select", selectPostMetaTimer)
+              .put("term-create", createTermTimer)
+              .put("term-select", selectTermTimer)
+              .build();
    }
 
    /**

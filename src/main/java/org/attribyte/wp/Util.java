@@ -50,10 +50,14 @@ public class Util {
       }
 
       String slug = buf.toString();
+      if(slug.length() == 0) {
+         return "";
+      }
+
       if(slug.charAt(0) == '-') {
          slug = slug.substring(1);
       }
-      if(slug.charAt(slug.length() - 1) == '-') {
+      if(slug.length() > 0 && slug.charAt(slug.length() - 1) == '-') {
          slug = slug.substring(0, slug.length() - 1);
       }
 

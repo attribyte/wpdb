@@ -39,6 +39,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.TimeZone;
@@ -502,6 +503,7 @@ public class DB {
     * Selects a page of posts with a specified type.
     * @param type The post type.
     * @param status The required post status.
+    * @param terms A collection of terms attached to the posts.
     * @param sort The page sort.
     * @param paging The page range and interval.
     * @return The list of posts.
@@ -523,11 +525,21 @@ public class DB {
       sql.append(postsTableName);
       if(terms != null && terms.size() > 0) {
          sql.append(",").append(termRelationshipsTableName);
-
+         sql.append(" WHERE post_type=? AND post_status=? AND object_id=ID AND ");
+         if(terms.size() == 1) {
+            sql.append("term_taxonomy_id=").append(terms.iterator().next().id);
+         } else {
+            sql.append("term_taxonomy_id IN (");
+            Iterator<TaxonomyTerm> iter = terms.iterator();
+            sql.append(iter.next().id);
+            while(iter.hasNext()) {
+               sql.append(",").append(iter.next().id);
+            }
+            sql.append(")");
+         }
+      } else {
+         sql.append(" WHERE post_type=? AND post_status=?");
       }
-
-
-      sql.append(" WHERE post_type=? AND post_status=?");
       appendPagingSortSQL(sql, sort, paging);
 
       Connection conn = null;

@@ -115,6 +115,36 @@ public class DBTest {
    }
 
    @Test
+   public void idSelectWithTerms() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      Post testPost0 = createTestPost(createdUser, -1);
+      db().insertPost(testPost0, TimeZone.getDefault());
+      db().setPostTerms(testPost0.id, "test_taxonomy", ImmutableList.of("test0", "test1"));
+
+      List<Long> posts = db().selectPostIds(Post.Type.POST, Post.Status.PUBLISH, ImmutableList.of(),Post.Sort.DESC, new Paging(0, 2));
+      assertNotNull(posts);
+      assertTrue(posts.size() > 0);
+
+      TaxonomyTerm test0 = db().resolveTaxonomyTerm("test_taxonomy", "test0");
+      assertNotNull(test0);
+
+      TaxonomyTerm test1 = db().resolveTaxonomyTerm("test_taxonomy", "test1");
+      assertNotNull(test1);
+
+      posts = db().selectPostIds(Post.Type.POST, Post.Status.PUBLISH, ImmutableList.of(test0),Post.Sort.DESC, new Paging(0, 2));
+      assertNotNull(posts);
+      assertTrue(posts.size() > 0);
+      assertEquals((Long)testPost0.id, posts.get(0));
+
+      posts = db().selectPostIds(Post.Type.POST, Post.Status.PUBLISH, ImmutableList.of(test0, test1),Post.Sort.DESC, new Paging(0, 2));
+      assertNotNull(posts);
+      assertTrue(posts.size() > 0);
+      assertEquals((Long)testPost0.id, posts.get(0));
+   }
+
+   @Test
    public void resolvePost() throws Exception {
       String username = StringUtil.randomString(8);
       User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());

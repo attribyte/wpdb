@@ -529,6 +529,22 @@ public class Post {
       }
 
       /**
+       * Gets the children.
+       * @return The children.
+       */
+      public List<Post> getChildren() {
+         return children;
+      }
+
+      /**
+       * Sets the children.
+       * @param children The children.
+       */
+      public void setChildren(final List<Post> children) {
+         this.children = children;
+      }
+
+      /**
        * Creates an empty builder.
        */
       Builder() {
@@ -555,6 +571,8 @@ public class Post {
          this.metadata = post.metadata != null ? Lists.newArrayList(post.metadata) : Lists.newArrayList();
          this.type = post.type;
          this.mimeType = post.mimeType;
+         this.taxonomyTerms = post.taxonomyTerms != null ? Maps.newHashMap(post.taxonomyTerms) : null;
+         this.children = post.children != null ? Lists.newArrayList(post.children) : null;
       }
 
       /**
@@ -568,7 +586,8 @@ public class Post {
          }
          return new Post(id, slug, title, excerpt, content, authorId, author,
                  publishTimestamp, modifiedTimestamp, status, parentId,
-                 guid, commentCount, metadata, type, mimeType, builder.build());
+                 guid, commentCount, metadata, type, mimeType, builder.build(),
+                 children != null ? ImmutableList.copyOf(children) : ImmutableList.of());
       }
 
       private long id;
@@ -588,6 +607,7 @@ public class Post {
       private Type type;
       private String mimeType;
       private Map<String, List<TaxonomyTerm>> taxonomyTerms;
+      private List<Post> children;
    }
 
    /**
@@ -612,7 +632,8 @@ public class Post {
         final Status status, final long parentId, final String guid, final int commentCount,
         final Collection<Meta> metadata, final Type type,
         final String mimeType,
-        final ImmutableMap<String, ImmutableList<TaxonomyTerm>> taxonomyTerms) {
+        final ImmutableMap<String, ImmutableList<TaxonomyTerm>> taxonomyTerms,
+        final ImmutableList<Post> children) {
       this.id = id;
       this.slug = slug;
       this.title = title;
@@ -630,6 +651,7 @@ public class Post {
       this.type = type;
       this.mimeType = mimeType;
       this.taxonomyTerms = taxonomyTerms;
+      this.children = children;
    }
 
    /**
@@ -640,7 +662,7 @@ public class Post {
    public final Post withAuthor(final User user) {
       return new Post(id, slug, title, excerpt, content, authorId, user,
               publishTimestamp, modifiedTimestamp, status, parentId,
-              guid, commentCount, metadata, type, mimeType, taxonomyTerms);
+              guid, commentCount, metadata, type, mimeType, taxonomyTerms, children);
    }
 
    /**
@@ -655,7 +677,7 @@ public class Post {
       }
       return new Post(id, slug, title, excerpt, content, authorId, author,
               publishTimestamp, modifiedTimestamp, status, parentId,
-              guid, commentCount, metadata, type, mimeType, builder.build());
+              guid, commentCount, metadata, type, mimeType, builder.build(), children);
    }
 
    /**
@@ -666,7 +688,19 @@ public class Post {
    public final Post withMetadata(final List<Meta> metadata) {
       return new Post(id, slug, title, excerpt, content, authorId, author,
               publishTimestamp, modifiedTimestamp, status, parentId,
-              guid, commentCount, metadata, type, mimeType, taxonomyTerms);
+              guid, commentCount, metadata, type, mimeType, taxonomyTerms, children);
+   }
+
+   /**
+    * Adds children to a post.
+    * @param children The children to add.
+    * @return The post with children added.
+    */
+   public final Post withChildren(final List<Post> children) {
+      return new Post(id, slug, title, excerpt, content, authorId, author,
+              publishTimestamp, modifiedTimestamp, status, parentId,
+              guid, commentCount, this.metadata, type, mimeType, taxonomyTerms,
+              children != null ? ImmutableList.copyOf(children) : ImmutableList.of());
    }
 
    /**
@@ -753,6 +787,11 @@ public class Post {
     * A map of taxonomy terms vs taxonomy name.
     */
    public final ImmutableMap<String, ImmutableList<TaxonomyTerm>> taxonomyTerms;
+
+   /**
+    * A list of children.
+    */
+   public final ImmutableList<Post> children;
 
    /**
     * An immutable list of tags associated with this post.

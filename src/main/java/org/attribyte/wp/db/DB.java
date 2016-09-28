@@ -144,7 +144,7 @@ public class DB {
 
       this.selectPostsBySlugSQL = selectPostSQL + this.postsTableName + " WHERE post_name=? ORDER BY ID DESC";
 
-      this.getChildrenSQL = selectPostSQL + this.postsTableName + " WHERE parent_id=? ORDER BY ID DESC";
+      this.selectChildrenSQL = selectPostSQL + this.postsTableName + " WHERE parent_id=? ORDER BY ID DESC";
    }
 
    private static final String createUserSQL =
@@ -558,7 +558,7 @@ public class DB {
       return ids;
    }
 
-   private final String getChildrenSQL;
+   private final String selectChildrenSQL;
 
    /**
     * Gets all children for a post.
@@ -567,7 +567,7 @@ public class DB {
     * @return The list of children.
     * @throws SQLException on database error.
     */
-   public List<Post> getChildren(final long parentId, final boolean withResolve) throws SQLException {
+   public List<Post> selectChildren(final long parentId, final boolean withResolve) throws SQLException {
 
       List<Post.Builder> builders = Lists.newArrayListWithExpectedSize(4);
 
@@ -577,7 +577,7 @@ public class DB {
 
       try {
          conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(getChildrenSQL);
+         stmt = conn.prepareStatement(selectChildrenSQL);
          stmt.setLong(1, parentId);
          rs = stmt.executeQuery();
          while(rs.next()) {
@@ -713,6 +713,12 @@ public class DB {
       if(terms.size() > 0) {
          post.setTaxonomyTerms(terms);
       }
+
+      List<Post> children = selectChildren(post.getId(), false);
+      if(children.size() > 0) {
+         post.setChildren(children);
+      }
+
       return post;
    }
 

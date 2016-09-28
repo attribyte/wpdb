@@ -21,6 +21,15 @@ package org.attribyte.wp.model;
 public class Meta {
 
    /**
+    * Creates metadata with no assigned id.
+    * @param key The key.
+    * @param value The value.
+    */
+   public Meta(final String key, final String value) {
+      this(0L, key, value);
+   }
+
+   /**
     * Creates metadata.
     * @param id The id.
     * @param key The key.

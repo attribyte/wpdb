@@ -31,6 +31,7 @@ import org.junit.Test;
 
 import java.util.List;
 import java.util.Properties;
+import java.util.Random;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -134,13 +135,25 @@ public class DBTest {
       String username = StringUtil.randomString(8);
       User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
-      db().deletePost(1001);
-      Post testPost = createTestPost(createdUser, 1001);
-      db().insertPost(testPost, TimeZone.getDefault());
+      Post testPost0 = createTestPost(createdUser, -1);
+      Post testPost1 = createTestPost(createdUser, -1);
+      db().insertPost(testPost0, TimeZone.getDefault());
+      db().insertPost(testPost1, TimeZone.getDefault());
 
       List<Post> posts = db().selectPosts(Post.Type.POST, Post.Status.PUBLISH, Post.Sort.DESC, new Paging(0, 2), true);
       assertNotNull(posts);
-      assertTrue(posts.size() > 0);
+      assertEquals(2, posts.size());
+
+      posts = db().selectPosts(Post.Type.POST, Post.Status.PUBLISH, Post.Sort.ID_DESC, new Paging(0, 2), true);
+      assertNotNull(posts);
+      assertEquals(2, posts.size());
+      assertTrue(posts.get(0).id > posts.get(1).id);
+
+      posts = db().selectPosts(Post.Type.POST, Post.Status.PUBLISH, Post.Sort.ID_ASC, new Paging(0, 2), true);
+      assertNotNull(posts);
+      assertEquals(2, posts.size());
+      assertTrue(posts.get(0).id < posts.get(1).id);
+
    }
 
    @Test
@@ -148,13 +161,41 @@ public class DBTest {
       String username = StringUtil.randomString(8);
       User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
-      db().deletePost(1001);
-      Post testPost = createTestPost(createdUser, 1001);
-      db().insertPost(testPost, TimeZone.getDefault());
-      Interval interval = new Interval(0, System.currentTimeMillis() + 1000L);
+      Post testPost0 = createTestPost(createdUser, -1);
+      Post testPost1 = createTestPost(createdUser, -1);
+      db().insertPost(testPost0, TimeZone.getDefault());
+      db().insertPost(testPost1, TimeZone.getDefault());
+
+      Interval interval = new Interval(0, System.currentTimeMillis() + 10000L);
       List<Post> posts = db().selectPosts(Post.Type.POST, Post.Status.PUBLISH, Post.Sort.DESC, new Paging(0, 2, interval), true);
       assertNotNull(posts);
-      assertTrue(posts.size() > 0);
+      assertEquals(2, posts.size());
+
+      posts = db().selectPosts(Post.Type.POST, Post.Status.PUBLISH, Post.Sort.DESC, new Paging(0, 1, interval), true);
+      assertNotNull(posts);
+      assertEquals(1, posts.size());
+   }
+
+   @Test
+   public void authorPosts() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      Post testPost0 = createTestPost(createdUser, -1);
+      Post testPost1 = createTestPost(createdUser, -1);
+      db().insertPost(testPost0, TimeZone.getDefault());
+      db().insertPost(testPost1, TimeZone.getDefault());
+      List<Post> posts = db().selectAuthorPosts(createdUser.id, Post.Sort.DESC, new Paging(0,2), true);
+      assertNotNull(posts);
+      assertEquals(2, posts.size());
+
+      posts = db().selectAuthorPosts(createdUser.id, Post.Sort.DESC, new Paging(0,1), true);
+      assertNotNull(posts);
+      assertEquals(1, posts.size());
+
+      posts = db().selectAuthorPosts(createdUser.id, Post.Sort.DESC, new Paging(2,1), true);
+      assertNotNull(posts);
+      assertEquals(0, posts.size());
    }
 
    @Test
@@ -216,23 +257,6 @@ public class DBTest {
       assertEquals(term0.id, matchTerm.id);
    }
 
-   private Post createTestPost(final User user, final long id) {
-      Post.Builder builder = Post.newBuilder();
-      String rnd = StringUtil.randomString(8);
-      builder.setId(id);
-      builder.setTitle("Test title " + rnd);
-      builder.setContent("Test content " + rnd);
-      builder.setAuthorId(user.id);
-      builder.setExcerpt("Text excerpt " + rnd);
-      builder.setSlug(rnd);
-      builder.setGUID("http://localhost?id="+rnd);
-      builder.setPublishTimestamp(System.currentTimeMillis());
-      builder.setModifiedTimestamp(System.currentTimeMillis());
-      builder.setStatus(Post.Status.PUBLISH);
-      builder.setType(Post.Type.POST);
-      return builder.build();
-   }
-
    @Test
    public void postTerms() throws Exception {
       String username = StringUtil.randomString(8);
@@ -285,4 +309,32 @@ public class DBTest {
 
    }
 
+   /**
+    * Creates a test post for a user.
+    * @param user The user.
+    * @param id The id. If < 0, random id is generated.
+    * @return The test post.
+    */
+   private Post createTestPost(final User user, long id) {
+      Post.Builder builder = Post.newBuilder();
+      String rndStr = StringUtil.randomString(8);
+      if(id < 0) {
+         id = Math.abs(rnd.nextInt());
+      }
+
+      builder.setId(id);
+      builder.setTitle("Test title " + rndStr);
+      builder.setContent("Test content " + rndStr);
+      builder.setAuthorId(user.id);
+      builder.setExcerpt("Text excerpt " + rndStr);
+      builder.setSlug(rndStr);
+      builder.setGUID("http://localhost?id="+rndStr);
+      builder.setPublishTimestamp(System.currentTimeMillis());
+      builder.setModifiedTimestamp(System.currentTimeMillis());
+      builder.setStatus(Post.Status.PUBLISH);
+      builder.setType(Post.Type.POST);
+      return builder.build();
+   }
+
+   private static final Random rnd = new Random();
 }

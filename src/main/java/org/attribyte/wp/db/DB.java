@@ -367,6 +367,70 @@ public class DB {
    }
 
    /**
+    * Selects a page of posts for an author, sorted by id.
+    * @param userId The user id for the author.
+    * @param sort The sort direction.
+    * @param paging The paging (range, if specified, is ignored).
+    * @param withResolve The associated users, etc be resolved?
+    * @return The list of posts.
+    * @throws SQLException on database error.
+    */
+   public List<Post> selectAuthorPosts(final long userId,
+                                       final Post.Sort sort,
+                                       final Paging paging,
+                                       final boolean withResolve) throws SQLException {
+
+      if(paging.limit < 1 || paging.start < 0) {
+         return ImmutableList.of();
+      }
+
+      List<Post.Builder> builders = Lists.newArrayListWithExpectedSize(paging.limit < 1024 ? paging.limit : 1024);
+
+      StringBuilder sql = new StringBuilder(selectPostSQL);
+      sql.append(postsTableName);
+      sql.append(" WHERE post_author=? ORDER BY ID ");
+      switch(sort) {
+         case ASC:
+         case ASC_MOD:
+         case ID_ASC:
+            sql.append("ASC");
+            break;
+         default:
+            sql.append("DESC");
+      }
+      sql.append(" LIMIT ?,?");
+
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(sql.toString());
+         stmt.setLong(1, userId);
+         stmt.setInt(2, paging.start);
+         stmt.setInt(3, paging.limit);
+         rs = stmt.executeQuery();
+         while(rs.next()) {
+            builders.add(postFromResultSet(rs));
+         }
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+
+      List<Post> posts = Lists.newArrayListWithExpectedSize(builders.size());
+      for(Post.Builder builder : builders) {
+         if(withResolve) {
+            posts.add(resolve(builder).build());
+         } else {
+            posts.add(builder.build());
+         }
+      }
+
+      return posts;
+   }
+
+   /**
     * Selects a page of posts with a specified type.
     * @param type The post type.
     * @param status The required post status.
@@ -405,11 +469,20 @@ public class DB {
          case ASC:
             sql.append(" ORDER BY post_date ASC");
             break;
+         case DESC:
+            sql.append(" ORDER BY post_date DESC");
+            break;
          case ASC_MOD:
             sql.append(" ORDER BY post_modified ASC");
             break;
          case DESC_MOD:
             sql.append(" ORDER BY post_modified DESC");
+            break;
+         case ID_ASC:
+            sql.append(" ORDER BY ID ASC");
+            break;
+         case ID_DESC:
+            sql.append(" ORDER BY ID DESC");
             break;
          default:
             sql.append(" ORDER BY post_date DESC");

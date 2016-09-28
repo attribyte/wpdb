@@ -172,7 +172,17 @@ public class Post {
       /**
        * Sort in descending order by last modified time.
        */
-      DESC_MOD
+      DESC_MOD,
+
+      /**
+       * Sort in ascending order of id.
+       */
+      ID_ASC,
+
+      /**
+       * Sort in descending order of id.
+       */
+      ID_DESC
    }
 
    /**

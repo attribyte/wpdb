@@ -100,6 +100,16 @@ public class Post {
       PAGE,
 
       /**
+       * Post is an attachment.
+       */
+      ATTACHMENT,
+
+      /**
+       * Post is a revision.
+       */
+      REVISION,
+
+      /**
        * Post type is unknown.
        */
       UNKNOWN;
@@ -113,6 +123,8 @@ public class Post {
          switch(Strings.nullToEmpty(str).trim().toLowerCase()) {
             case "post" : return POST;
             case "page" : return PAGE;
+            case "attachment" : return ATTACHMENT;
+            case "revision" : return REVISION;
             default: return UNKNOWN;
          }
       }

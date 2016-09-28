@@ -59,6 +59,7 @@ public class DB {
              final long siteId,
              final Set<String> cachedTaxonomies) {
       this.connectionSupplier = connectionSupplier;
+      this.siteId = siteId;
 
       final String termRelationshipsTableName;
       final String postMetaTableName;
@@ -1053,7 +1054,7 @@ public class DB {
     * @return The site metadata.
     * @throws SQLException on database error.
     */
-   public Site selectSite(final long siteId) throws SQLException {
+   public Site selectSite() throws SQLException {
       String baseURL = getOption("home");
       String title = getOption("blogname");
       String description = getOption("blogdescription");
@@ -1066,11 +1067,13 @@ public class DB {
       return new Site(siteId, baseURL, title, description, permalinkStructure, defaultCategoryTerm.term);
    }
 
+   /**
+    * The site id.
+    */
+   public final long siteId;
 
    private final ConnectionSupplier connectionSupplier;
-
    private final String postsTableName;
-
    private final Cache<Long, User> userCache;
    private final Cache<String, User> usernameCache;
    private final ImmutableMap<String, Cache<String, TaxonomyTerm>> taxonomyTermCaches;

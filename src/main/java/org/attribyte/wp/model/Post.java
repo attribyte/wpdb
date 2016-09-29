@@ -599,12 +599,12 @@ public class Post {
       private User author;
       private long publishTimestamp;
       private long modifiedTimestamp;
-      private Status status;
+      private Status status = Status.PUBLISH;
       private long parentId;
       private String guid;
       private int commentCount;
       private List<Meta> metadata;
-      private Type type;
+      private Type type = Type.POST;
       private String mimeType;
       private Map<String, List<TaxonomyTerm>> taxonomyTerms;
       private List<Post> children;
@@ -652,6 +652,16 @@ public class Post {
       this.mimeType = mimeType;
       this.taxonomyTerms = taxonomyTerms;
       this.children = children;
+   }
+
+   /**
+    * Changes the modified time of a post to the current time.
+    * @return The post with modified time set to the current time.
+    */
+   public final Post modifiedNow() {
+      return new Post(id, slug, title, excerpt, content, authorId, author,
+              publishTimestamp, System.currentTimeMillis(), status, parentId,
+              guid, commentCount, metadata, type, mimeType, taxonomyTerms, children);
    }
 
    /**

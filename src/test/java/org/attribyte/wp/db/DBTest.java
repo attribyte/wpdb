@@ -111,6 +111,27 @@ public class DBTest {
    }
 
    @Test
+   public void updatePost() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      db().deletePost(1000);
+      Post testPost = createTestPost(createdUser, 1000);
+      db().insertPost(testPost, TimeZone.getDefault());
+      Post.Builder insertedPost = db().selectPost(testPost.id);
+      assertNotNull(insertedPost);
+      insertedPost.setTitle("T");
+      insertedPost.setExcerpt("E");
+      insertedPost.setContent("C");
+      insertedPost.setGUID("G");
+      Post updatedPost = db().updatePost(insertedPost.build(), TimeZone.getDefault());
+      assertEquals("T", updatedPost.title);
+      assertEquals("E", updatedPost.excerpt);
+      assertEquals("C", updatedPost.content);
+      assertEquals("G", updatedPost.guid);
+   }
+
+   @Test
    public void parentChild() throws Exception {
       String username = StringUtil.randomString(8);
       User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());

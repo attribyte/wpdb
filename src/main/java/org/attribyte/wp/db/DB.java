@@ -18,6 +18,7 @@ package org.attribyte.wp.db;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.Metric;
 import com.codahale.metrics.MetricSet;
+import com.codahale.metrics.Timer;
 import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -25,7 +26,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import org.attribyte.essem.metrics.Timer;
 import org.attribyte.sql.ConnectionSupplier;
 import org.attribyte.util.SQLUtil;
 import org.attribyte.wp.model.Meta;
@@ -58,8 +58,42 @@ import static org.attribyte.wp.Util.slugify;
 public class DB implements MetricSet {
 
    /**
-    * Creates a database with a connection supplier.
-    * @param connectionSupplier The connection supplier.
+    * A source for metrics.
+    * <p>
+    *    Allows caller to replace implementation (e.g. use HDR timer).
+    * </p>
+    */
+   public interface MetricSource {
+
+      /**
+       * Creates a new timer.
+       * @return The new timer.
+       */
+      public Timer newTimer();
+
+      /**
+       * Creates a new meter.
+       * @return The new meter.
+       */
+      public Meter newMeter();
+
+
+      public static final MetricSource DEFAULT = new MetricSource() {
+         @Override
+         public Timer newTimer() {
+            return new Timer();
+         }
+
+         @Override
+         public Meter newMeter() {
+            return new Meter();
+         }
+      };
+   }
+
+   /**
+    * Creates a database with the default metric source.
+    * @param connectionSupplier Supplies connections to the underlying database.
     * @param siteId The site id.
     * @param cachedTaxonomies Enable caches for these taxonomies.
     * @param taxonomyCacheTimeout The expiration for taxonomy caches. If {@code 0}, caching is disabled.
@@ -70,6 +104,24 @@ public class DB implements MetricSet {
              final Set<String> cachedTaxonomies,
              final Duration taxonomyCacheTimeout,
              final Duration userCacheTimeout) {
+      this(connectionSupplier, siteId, cachedTaxonomies, taxonomyCacheTimeout, userCacheTimeout, MetricSource.DEFAULT);
+   }
+
+   /**
+    * Creates a database.
+    * @param connectionSupplier Supplies connections to the underlying database.
+    * @param siteId The site id.
+    * @param cachedTaxonomies Enable caches for these taxonomies.
+    * @param taxonomyCacheTimeout The expiration for taxonomy caches. If {@code 0}, caching is disabled.
+    * @param userCacheTimeout The expiration for user caches. If {@code 0}, caching is disabled.
+    * @param metricSource A metric source.
+    */
+   public DB(final ConnectionSupplier connectionSupplier,
+             final long siteId,
+             final Set<String> cachedTaxonomies,
+             final Duration taxonomyCacheTimeout,
+             final Duration userCacheTimeout,
+             final MetricSource metricSource) {
       this.connectionSupplier = connectionSupplier;
       this.siteId = siteId;
 
@@ -168,6 +220,43 @@ public class DB implements MetricSet {
                       "post_excerpt, post_status, post_name, post_modified, post_modified_gmt," +
                       "post_parent, guid, post_type, to_ping, pinged, post_content_filtered) VALUES " +
                       "(?,?,?,?,?,?,?,?,?,?,?,?,?, '','', '')";
+
+      this.updatePostSQL = "UPDATE " + postsTableName +
+              " SET post_author=?, post_date=?, post_date_gmt=?, post_content=?, post_title=?, " +
+              "post_excerpt=?, post_status=?, post_name=?, post_modified=?, post_modified_gmt=?, post_parent=?, " +
+              "guid=?, post_type=? WHERE ID=?";
+
+      this.optionSelectTimer = metricSource.newTimer();
+      this.postTermsSelectTimer = metricSource.newTimer();
+      this.postTermsSetTimer = metricSource.newTimer();
+      this.postTermsClearTimer = metricSource.newTimer();
+      this.taxonomyTermResolveTimer = metricSource.newTimer();
+      this.selectTaxonomyTermTimer = metricSource.newTimer();
+      this.createTaxonomyTermTimer = metricSource.newTimer();
+      this.createUserTimer = metricSource.newTimer();
+      this.selectUserTimer = metricSource.newTimer();
+      this.userMetadataTimer = metricSource.newTimer();
+      this.deletePostTimer = metricSource.newTimer();
+      this.selectAuthorPostsTimer = metricSource.newTimer();
+      this.selectPostsTimer = metricSource.newTimer();
+      this.selectPostIdsTimer = metricSource.newTimer();
+      this.selectChildrenTimer = metricSource.newTimer();
+      this.selectSlugPostsTimer = metricSource.newTimer();
+      this.selectPostTimer = metricSource.newTimer();
+      this.insertPostTimer = metricSource.newTimer();
+      this.updatePostTimer = metricSource.newTimer();
+      this.clearPostMetaTimer = metricSource.newTimer();
+      this.selectPostMetaTimer = metricSource.newTimer();
+      this.setPostMetaTimer = metricSource.newTimer();
+      this.createTermTimer = metricSource.newTimer();
+      this.selectTermTimer = metricSource.newTimer();
+      this.resolvePostTimer = metricSource.newTimer();
+      this.userCacheHits = metricSource.newMeter();
+      this.userCacheTries = metricSource.newMeter();
+      this.usernameCacheHits = metricSource.newMeter();
+      this.usernameCacheTries = metricSource.newMeter();
+      this.taxonomyTermCacheHits = metricSource.newMeter();
+      this.taxonomyTermCacheTries = metricSource.newMeter();
    }
 
    private static final String createUserSQL =
@@ -803,6 +892,51 @@ public class DB implements MetricSet {
       }
    }
 
+   private final String updatePostSQL;
+
+   /**
+    * Updates a post.
+    * @param post The post to update. The {@code id} must be set.
+    * @param tz The local time zone.
+    * @return The updated post.
+    * @throws SQLException on database error or missing post id.
+    */
+   public Post updatePost(Post post, final TimeZone tz) throws SQLException {
+      if(post.id < 1L) {
+         throw new SQLException("The post id must be specified for update");
+      }
+
+      post = post.modifiedNow();
+
+      int offset = tz.getOffset(post.publishTimestamp);
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      Timer.Context ctx = updatePostTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(updatePostSQL);
+         stmt.setLong(1, post.authorId);
+         stmt.setTimestamp(2, new Timestamp(post.publishTimestamp));
+         stmt.setTimestamp(3, new Timestamp(post.publishTimestamp - offset));
+         stmt.setString(4, Strings.nullToEmpty(post.content));
+         stmt.setString(5, Strings.nullToEmpty(post.title));
+         stmt.setString(6, Strings.nullToEmpty(post.excerpt));
+         stmt.setString(7, post.status.toString().toLowerCase());
+         stmt.setString(8, Strings.nullToEmpty(post.slug));
+         stmt.setTimestamp(9, new Timestamp(post.modifiedTimestamp));
+         stmt.setTimestamp(10, new Timestamp(post.modifiedTimestamp - offset));
+         stmt.setLong(11, post.parentId);
+         stmt.setString(12, Strings.nullToEmpty(post.guid));
+         stmt.setString(13, post.type.toString().toLowerCase());
+         stmt.setLong(14, post.id);
+         stmt.executeUpdate();
+         return post;
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt);
+      }
+   }
+
    private final String insertPostWithIdSQL;
    private final String insertPostSQL;
 
@@ -843,7 +977,7 @@ public class DB implements MetricSet {
          stmt.setTimestamp(10, new Timestamp(post.modifiedTimestamp - offset));
          stmt.setLong(11, post.parentId);
          stmt.setString(12, Strings.nullToEmpty(post.guid));
-         stmt.setString(13, "post");
+         stmt.setString(13, post.type.toString().toLowerCase());
          stmt.executeUpdate();
          rs = stmt.getGeneratedKeys();
          if(rs.next()) {
@@ -878,7 +1012,7 @@ public class DB implements MetricSet {
          stmt.setTimestamp(11, new Timestamp(post.modifiedTimestamp - offset));
          stmt.setLong(12, post.parentId);
          stmt.setString(13, Strings.nullToEmpty(post.guid));
-         stmt.setString(14, "post");
+         stmt.setString(14, post.type.toString().toLowerCase());
          stmt.executeUpdate();
          return post;
       } finally {
@@ -1441,39 +1575,40 @@ public class DB implements MetricSet {
       return new Site(siteId, baseURL, title, description, permalinkStructure, defaultCategoryTerm.term);
    }
 
-   private final Timer optionSelectTimer = new Timer();
-   private final Timer postTermsSelectTimer = new Timer();
-   private final Timer postTermsSetTimer = new Timer();
-   private final Timer postTermsClearTimer = new Timer();
-   private final Timer taxonomyTermResolveTimer = new Timer();
-   private final Timer selectTaxonomyTermTimer = new Timer();
-   private final Timer createTaxonomyTermTimer = new Timer();
-   private final Timer createUserTimer = new Timer();
-   private final Timer selectUserTimer = new Timer();
-   private final Timer userMetadataTimer = new Timer();
-   private final Timer deletePostTimer = new Timer();
-   private final Timer selectAuthorPostsTimer = new Timer();
-   private final Timer selectPostsTimer = new Timer();
-   private final Timer selectPostIdsTimer = new Timer();
-   private final Timer selectChildrenTimer = new Timer();
-   private final Timer selectSlugPostsTimer = new Timer();
-   private final Timer selectPostTimer = new Timer();
-   private final Timer insertPostTimer = new Timer();
-   private final Timer clearPostMetaTimer = new Timer();
-   private final Timer selectPostMetaTimer = new Timer();
-   private final Timer setPostMetaTimer = new Timer();
-   private final Timer createTermTimer = new Timer();
-   private final Timer selectTermTimer = new Timer();
-   private final Timer resolvePostTimer = new Timer();
+   private final Timer optionSelectTimer;
+   private final Timer postTermsSelectTimer;
+   private final Timer postTermsSetTimer;
+   private final Timer postTermsClearTimer;
+   private final Timer taxonomyTermResolveTimer;
+   private final Timer selectTaxonomyTermTimer;
+   private final Timer createTaxonomyTermTimer;
+   private final Timer createUserTimer;
+   private final Timer selectUserTimer;
+   private final Timer userMetadataTimer;
+   private final Timer deletePostTimer;
+   private final Timer selectAuthorPostsTimer;
+   private final Timer selectPostsTimer;
+   private final Timer selectPostIdsTimer;
+   private final Timer selectChildrenTimer;
+   private final Timer selectSlugPostsTimer;
+   private final Timer selectPostTimer;
+   private final Timer insertPostTimer;
+   private final Timer updatePostTimer;
+   private final Timer clearPostMetaTimer;
+   private final Timer selectPostMetaTimer;
+   private final Timer setPostMetaTimer;
+   private final Timer createTermTimer;
+   private final Timer selectTermTimer;
+   private final Timer resolvePostTimer;
 
-   private final Meter userCacheHits = new Meter();
-   private final Meter userCacheTries = new Meter();
+   private final Meter userCacheHits;
+   private final Meter userCacheTries;
 
-   private final Meter usernameCacheHits = new Meter();
-   private final Meter usernameCacheTries = new Meter();
+   private final Meter usernameCacheHits;
+   private final Meter usernameCacheTries;
 
-   private final Meter taxonomyTermCacheHits = new Meter();
-   private final Meter taxonomyTermCacheTries = new Meter();
+   private final Meter taxonomyTermCacheHits;
+   private final Meter taxonomyTermCacheTries;
 
    @Override
    public Map<String, Metric> getMetrics() {
@@ -1496,6 +1631,7 @@ public class DB implements MetricSet {
               .put("select-slug-post", selectSlugPostsTimer)
               .put("select-post", selectPostTimer)
               .put("insert-post", insertPostTimer)
+              .put("update-post", updatePostTimer)
               .put("resolve-post", resolvePostTimer)
               .put("set-post-meta", setPostMetaTimer)
               .put("clear-post-meta", clearPostMetaTimer)

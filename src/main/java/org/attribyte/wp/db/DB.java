@@ -156,6 +156,18 @@ public class DB implements MetricSet {
       this.selectPostsBySlugSQL = selectPostSQL + this.postsTableName + " WHERE post_name=? ORDER BY ID DESC";
 
       this.selectChildrenSQL = selectPostSQL + this.postsTableName + " WHERE post_parent=? ORDER BY ID DESC";
+
+      this.insertPostWithIdSQL = "INSERT INTO " + postsTableName +
+              " (ID, post_author, post_date, post_date_gmt, post_content, post_title, " +
+                      "post_excerpt, post_status, post_name, post_modified, post_modified_gmt," +
+                      "post_parent, guid, post_type, to_ping, pinged, post_content_filtered) VALUES " +
+                      "(?,?,?,?,?,?,?,?,?,?,?,?,?,?, '','', '')";
+
+      this.insertPostSQL = "INSERT INTO " + postsTableName +
+              " (post_author, post_date, post_date_gmt, post_content, post_title, " +
+                      "post_excerpt, post_status, post_name, post_modified, post_modified_gmt," +
+                      "post_parent, guid, post_type, to_ping, pinged, post_content_filtered) VALUES " +
+                      "(?,?,?,?,?,?,?,?,?,?,?,?,?, '','', '')";
    }
 
    private static final String createUserSQL =
@@ -283,7 +295,7 @@ public class DB implements MetricSet {
       userCacheTries.mark();
       User user = userCache.getIfPresent(userId);
       if(user != null) {
-         userCacheHits.mark();;
+         userCacheHits.mark();
          return user;
       } else {
          user = selectUser(userId);
@@ -737,31 +749,35 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public Post.Builder resolve(final Post.Builder post) throws SQLException {
-      User author = resolveUser(post.getAuthorId());
-      if(author != null) {
-         List<Meta> meta = userMetadata(post.getAuthorId());
-         if(meta.size() > 0) {
-            author = author.withMetadata(meta);
+      Timer.Context ctx = resolvePostTimer.time();
+      try {
+         User author = resolveUser(post.getAuthorId());
+         if(author != null) {
+            List<Meta> meta = userMetadata(post.getAuthorId());
+            if(meta.size() > 0) {
+               author = author.withMetadata(meta);
+            }
+            post.setAuthor(author);
          }
-         post.setAuthor(author);
-      }
 
-      List<Meta> meta = selectPostMeta(post.getId());
-      if(meta.size() > 0) {
-         post.setMetadata(meta);
-      }
+         List<Meta> meta = selectPostMeta(post.getId());
+         if(meta.size() > 0) {
+            post.setMetadata(meta);
+         }
 
-      List<TaxonomyTerm> terms = selectPostTerms(post.getId());
-      if(terms.size() > 0) {
-         post.setTaxonomyTerms(terms);
-      }
+         List<TaxonomyTerm> terms = selectPostTerms(post.getId());
+         if(terms.size() > 0) {
+            post.setTaxonomyTerms(terms);
+         }
 
-      List<Post> children = selectChildren(post.getId(), false);
-      if(children.size() > 0) {
-         post.setChildren(children);
+         List<Post> children = selectChildren(post.getId(), false);
+         if(children.size() > 0) {
+            post.setChildren(children);
+         }
+         return post;
+      } finally {
+         ctx.stop();
       }
-
-      return post;
    }
 
    /**
@@ -787,25 +803,68 @@ public class DB implements MetricSet {
       }
    }
 
-   private static final String insertPostWithIdSQL =
-           " (ID, post_author, post_date, post_date_gmt, post_content, post_title, " +
-                   "post_excerpt, post_status, post_name, post_modified, post_modified_gmt," +
-                   "post_parent, guid, post_type, to_ping, pinged, post_content_filtered) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, '','', '')";
+   private final String insertPostWithIdSQL;
+   private final String insertPostSQL;
 
    /**
     * Inserts a post.
+    *
+    * <p>
+    *    If the post has a non-zero {@code id}, it will be inserted with this id,
+    *    otherwise an id will be generated.
+    * </p>
     * @param post The post.
     * @param tz The local time zone for the post.
-    * @throws SQLException on database error.
+    * @return The post with generated id.
+    * @throws SQLException on database error or post with duplicate id.
     */
-   public void insertPost(final Post post, final TimeZone tz) throws SQLException {
+   public Post insertPost(final Post post, final TimeZone tz) throws SQLException {
+      if(post.id > 0) {
+         return insertPostWithId(post, tz);
+      }
+
+      int offset = tz.getOffset(post.publishTimestamp);
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+      Timer.Context ctx = insertPostTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(insertPostSQL, Statement.RETURN_GENERATED_KEYS);
+         stmt.setLong(1, post.authorId);
+         stmt.setTimestamp(2, new Timestamp(post.publishTimestamp));
+         stmt.setTimestamp(3, new Timestamp(post.publishTimestamp - offset));
+         stmt.setString(4, Strings.nullToEmpty(post.content));
+         stmt.setString(5, Strings.nullToEmpty(post.title));
+         stmt.setString(6, Strings.nullToEmpty(post.excerpt));
+         stmt.setString(7, post.status.toString().toLowerCase());
+         stmt.setString(8, Strings.nullToEmpty(post.slug));
+         stmt.setTimestamp(9, new Timestamp(post.modifiedTimestamp));
+         stmt.setTimestamp(10, new Timestamp(post.modifiedTimestamp - offset));
+         stmt.setLong(11, post.parentId);
+         stmt.setString(12, Strings.nullToEmpty(post.guid));
+         stmt.setString(13, "post");
+         stmt.executeUpdate();
+         rs = stmt.getGeneratedKeys();
+         if(rs.next()) {
+            return post.withId(rs.getLong(1));
+         } else {
+            throw new SQLException("Problem creating post (no generated id)");
+         }
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+   }
+
+   private Post insertPostWithId(final Post post, final TimeZone tz) throws SQLException {
       int offset = tz.getOffset(post.publishTimestamp);
       Connection conn = null;
       PreparedStatement stmt = null;
       Timer.Context ctx = insertPostTimer.time();
       try {
          conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement("INSERT INTO " + postsTableName + insertPostWithIdSQL);
+         stmt = conn.prepareStatement(insertPostWithIdSQL);
          stmt.setLong(1, post.id);
          stmt.setLong(2, post.authorId);
          stmt.setTimestamp(3, new Timestamp(post.publishTimestamp));
@@ -821,6 +880,7 @@ public class DB implements MetricSet {
          stmt.setString(13, Strings.nullToEmpty(post.guid));
          stmt.setString(14, "post");
          stmt.executeUpdate();
+         return post;
       } finally {
          ctx.stop();
          SQLUtil.closeQuietly(conn, stmt);
@@ -1133,13 +1193,13 @@ public class DB implements MetricSet {
          return term;
       }
 
-      Timer.Context ctx = taxonomyTermResolveTimer.time();
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
       long termId = 0;
       String taxonomy = "";
       String description = "";
+      Timer.Context ctx = taxonomyTermResolveTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectTaxonomyTermIdSQL);
@@ -1173,21 +1233,18 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public void clearPostTerm(final long postId, final long taxonomyTermId) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
       Timer.Context ctx = postTermsClearTimer.time();
       try {
-         Connection conn = null;
-         PreparedStatement stmt = null;
-         try {
-            conn = connectionSupplier.getConnection();
-            stmt = conn.prepareStatement(clearPostTermSQL);
-            stmt.setLong(1, postId);
-            stmt.setLong(2, taxonomyTermId);
-            stmt.executeUpdate();
-         } finally {
-            SQLUtil.closeQuietly(conn, stmt);
-         }
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(clearPostTermSQL);
+         stmt.setLong(1, postId);
+         stmt.setLong(2, taxonomyTermId);
+         stmt.executeUpdate();
       } finally {
          ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt);
       }
    }
 
@@ -1199,20 +1256,17 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public void clearPostTerms(final long postId) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
       Timer.Context ctx = postTermsClearTimer.time();
       try {
-         Connection conn = null;
-         PreparedStatement stmt = null;
-         try {
-            conn = connectionSupplier.getConnection();
-            stmt = conn.prepareStatement(clearPostTermsSQL);
-            stmt.setLong(1, postId);
-            stmt.executeUpdate();
-         } finally {
-            SQLUtil.closeQuietly(conn, stmt);
-         }
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(clearPostTermsSQL);
+         stmt.setLong(1, postId);
+         stmt.executeUpdate();
       } finally {
          ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt);
       }
    }
 
@@ -1243,40 +1297,35 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public List<TaxonomyTerm> setPostTerms(final long postId, final String taxonomy, final List<String> terms) throws SQLException {
+      clearPostTerms(postId, taxonomy);
+      if(terms == null || terms.size() == 0) {
+         return ImmutableList.of();
+      }
 
+      List<TaxonomyTerm> taxonomyTerms = Lists.newArrayListWithExpectedSize(terms.size());
+      for(String term : terms) {
+         taxonomyTerms.add(resolveTaxonomyTerm(taxonomy, term));
+      }
+
+      Connection conn = null;
+      PreparedStatement stmt = null;
       Timer.Context ctx = postTermsSetTimer.time();
-
       try {
-         clearPostTerms(postId, taxonomy);
-         if(terms == null || terms.size() == 0) {
-            return ImmutableList.of();
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(insertPostTermSQL);
+         int pos = 0;
+         for(TaxonomyTerm taxonomyTerm : taxonomyTerms) {
+            stmt.setLong(1, postId);
+            stmt.setLong(2, taxonomyTerm.id);
+            stmt.setInt(3, pos++);
+            stmt.executeUpdate();
          }
-
-         List<TaxonomyTerm> taxonomyTerms = Lists.newArrayListWithExpectedSize(terms.size());
-         for(String term : terms) {
-            taxonomyTerms.add(resolveTaxonomyTerm(taxonomy, term));
-         }
-
-         Connection conn = null;
-         PreparedStatement stmt = null;
-         try {
-            conn = connectionSupplier.getConnection();
-            stmt = conn.prepareStatement(insertPostTermSQL);
-            int pos = 0;
-            for(TaxonomyTerm taxonomyTerm : taxonomyTerms) {
-               stmt.setLong(1, postId);
-               stmt.setLong(2, taxonomyTerm.id);
-               stmt.setInt(3, pos++);
-               stmt.executeUpdate();
-            }
-         } finally {
-            SQLUtil.closeQuietly(conn, stmt);
-         }
-
-         return taxonomyTerms;
       } finally {
          ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt);
       }
+
+      return taxonomyTerms;
    }
 
    public final String selectPostTermsSQL;
@@ -1300,41 +1349,36 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public List<TaxonomyTerm> selectPostTerms(final long postId, final String taxonomy) throws SQLException {
-
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+      List<Long> termIds = Lists.newArrayListWithExpectedSize(8);
       Timer.Context ctx = postTermsSelectTimer.time();
-
       try {
-         Connection conn = null;
-         PreparedStatement stmt = null;
-         ResultSet rs = null;
-         List<Long> termIds = Lists.newArrayListWithExpectedSize(8);
-         try {
-            conn = connectionSupplier.getConnection();
-            stmt = conn.prepareStatement(selectPostTermsSQL);
-            stmt.setLong(1, postId);
-            rs = stmt.executeQuery();
-            while(rs.next()) {
-               termIds.add(rs.getLong(1));
-            }
-         } finally {
-            SQLUtil.closeQuietly(conn, stmt, rs);
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(selectPostTermsSQL);
+         stmt.setLong(1, postId);
+         rs = stmt.executeQuery();
+         while(rs.next()) {
+            termIds.add(rs.getLong(1));
          }
-
-         if(termIds.size() == 0) {
-            return ImmutableList.of();
-         }
-
-         List<TaxonomyTerm> terms = Lists.newArrayListWithExpectedSize(termIds.size());
-         for(long termId : termIds) {
-            TaxonomyTerm term = resolveTaxonomyTerm(termId);
-            if(term != null && (taxonomy == null || term.taxonomy.equals(taxonomy))) {
-               terms.add(term);
-            }
-         }
-         return terms;
       } finally {
          ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt, rs);
       }
+
+      if(termIds.size() == 0) {
+         return ImmutableList.of();
+      }
+
+      List<TaxonomyTerm> terms = Lists.newArrayListWithExpectedSize(termIds.size());
+      for(long termId : termIds) {
+         TaxonomyTerm term = resolveTaxonomyTerm(termId);
+         if(term != null && (taxonomy == null || term.taxonomy.equals(taxonomy))) {
+            terms.add(term);
+         }
+      }
+      return terms;
    }
 
    private final String selectOptionSQL;
@@ -1358,29 +1402,24 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public String selectOption(final String optionName, final String defaultValue) throws SQLException {
-
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
       Timer.Context ctx = optionSelectTimer.time();
-
       try {
-         Connection conn = null;
-         PreparedStatement stmt = null;
-         ResultSet rs = null;
-         try {
-            conn = connectionSupplier.getConnection();
-            stmt = conn.prepareStatement(selectOptionSQL);
-            stmt.setString(1, optionName);
-            rs = stmt.executeQuery();
-            if(rs.next()) {
-               String val = rs.getString(1);
-               return val != null ? val.trim() : defaultValue;
-            } else {
-               return defaultValue;
-            }
-         } finally {
-            SQLUtil.closeQuietly(conn, stmt, rs);
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(selectOptionSQL);
+         stmt.setString(1, optionName);
+         rs = stmt.executeQuery();
+         if(rs.next()) {
+            String val = rs.getString(1);
+            return val != null ? val.trim() : defaultValue;
+         } else {
+            return defaultValue;
          }
       } finally {
          ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt, rs);
       }
    }
 
@@ -1425,6 +1464,7 @@ public class DB implements MetricSet {
    private final Timer setPostMetaTimer = new Timer();
    private final Timer createTermTimer = new Timer();
    private final Timer selectTermTimer = new Timer();
+   private final Timer resolvePostTimer = new Timer();
 
    private final Meter userCacheHits = new Meter();
    private final Meter userCacheTries = new Meter();
@@ -1456,6 +1496,7 @@ public class DB implements MetricSet {
               .put("select-slug-post", selectSlugPostsTimer)
               .put("select-post", selectPostTimer)
               .put("insert-post", insertPostTimer)
+              .put("resolve-post", resolvePostTimer)
               .put("set-post-meta", setPostMetaTimer)
               .put("clear-post-meta", clearPostMetaTimer)
               .put("select-post-meta", selectPostMetaTimer)

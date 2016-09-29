@@ -92,6 +92,17 @@ public class DBTest {
       String username = StringUtil.randomString(8);
       User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
+      Post testPost = createTestPost(createdUser, 1000).withId(0L);
+      Post createdPost = db().insertPost(testPost, TimeZone.getDefault());
+      assertNotNull(createdPost);
+      assertTrue(createdPost.id > 0L);
+   }
+
+   @Test
+   public void insertPostWithId() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
       db().deletePost(1000);
       Post testPost = createTestPost(createdUser, 1000);
       db().insertPost(testPost, TimeZone.getDefault());

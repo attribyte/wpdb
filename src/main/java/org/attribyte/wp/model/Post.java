@@ -655,6 +655,17 @@ public class Post {
    }
 
    /**
+    * Adds an id to a post.
+    * @param id The id.
+    * @return The post with id added.
+    */
+   public final Post withId(final long id) {
+      return new Post(id, slug, title, excerpt, content, authorId, author,
+              publishTimestamp, modifiedTimestamp, status, parentId,
+              guid, commentCount, metadata, type, mimeType, taxonomyTerms, children);
+   }
+
+   /**
     * Adds a parent id to a post.
     * @param parentId The parent id.
     * @return The post with parent added.

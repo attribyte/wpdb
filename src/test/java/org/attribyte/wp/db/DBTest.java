@@ -29,6 +29,7 @@ import org.attribyte.wp.model.User;
 import org.joda.time.Interval;
 import org.junit.Test;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
 import java.util.Random;
@@ -50,7 +51,8 @@ public class DBTest {
          props.put("driver", "com.mysql.jdbc.Driver");
          props.put("host", "localhost");
          props.put("db", "wordpress_test");
-         _db = new DB(new SimpleConnectionSource(props), 1, ImmutableSet.of("test_taxonomy_with_cache"));
+         _db = new DB(new SimpleConnectionSource(props), 1, ImmutableSet.of("test_taxonomy_with_cache"),
+                 Duration.ofMinutes(30), Duration.ofMinutes(30));
       }
       return _db;
    }

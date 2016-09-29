@@ -42,6 +42,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -60,11 +61,15 @@ public class DB implements MetricSet {
     * Creates a database with a connection supplier.
     * @param connectionSupplier The connection supplier.
     * @param siteId The site id.
-    * @param cachedTaxonomies A set of cached taxonomies.
+    * @param cachedTaxonomies Enable caches for these taxonomies.
+    * @param taxonomyCacheTimeout The expiration for taxonomy caches. If {@code 0}, caching is disabled.
+    * @param userCacheTimeout The expiration for user caches. If {@code 0}, caching is disabled.
     */
    public DB(final ConnectionSupplier connectionSupplier,
              final long siteId,
-             final Set<String> cachedTaxonomies) {
+             final Set<String> cachedTaxonomies,
+             final Duration taxonomyCacheTimeout,
+             final Duration userCacheTimeout) {
       this.connectionSupplier = connectionSupplier;
       this.siteId = siteId;
 
@@ -91,12 +96,12 @@ public class DB implements MetricSet {
 
       this.userCache = CacheBuilder.newBuilder()
               .concurrencyLevel(4)
-              .expireAfterWrite(30, TimeUnit.MINUTES) //Configure..
+              .expireAfterWrite(userCacheTimeout.toMillis(), TimeUnit.MILLISECONDS)
               .build();
 
       this.usernameCache = CacheBuilder.newBuilder()
               .concurrencyLevel(4)
-              .expireAfterWrite(30, TimeUnit.MINUTES) //Configure..
+              .expireAfterWrite(userCacheTimeout.toMillis(), TimeUnit.MILLISECONDS)
               .build();
 
       ImmutableMap.Builder<String, Cache<String, TaxonomyTerm>> taxonomyTermCachesBuilder = ImmutableMap.builder();
@@ -104,7 +109,7 @@ public class DB implements MetricSet {
          taxonomyTermCachesBuilder.put(taxonomy,
                  CacheBuilder.newBuilder()
                  .concurrencyLevel(4)
-                 .expireAfterWrite(30, TimeUnit.MINUTES)
+                 .expireAfterWrite(taxonomyCacheTimeout.toMillis(), TimeUnit.MILLISECONDS)
                  .build()
                  );
       }
@@ -113,7 +118,7 @@ public class DB implements MetricSet {
 
       this.taxonomyTermCache = CacheBuilder.newBuilder()
               .concurrencyLevel(4)
-              .expireAfterWrite(30, TimeUnit.MINUTES)
+              .expireAfterWrite(taxonomyCacheTimeout.toMillis(), TimeUnit.MILLISECONDS)
               .build();
 
       this.deletePostIdSQL = "DELETE FROM " + postsTableName + " WHERE ID=?";
@@ -1089,8 +1094,10 @@ public class DB implements MetricSet {
       TaxonomyTerm term;
       Cache<String, TaxonomyTerm> taxonomyTermCache = taxonomyTermCaches.get(taxonomy);
       if(taxonomyTermCache != null) {
+         taxonomyTermCacheTries.mark();
          term = taxonomyTermCache.getIfPresent(name);
          if(term != null) {
+            taxonomyTermCacheHits.mark();
             return term;
          }
       }
@@ -1119,8 +1126,10 @@ public class DB implements MetricSet {
     */
    public TaxonomyTerm resolveTaxonomyTerm(final long id) throws SQLException {
 
+      taxonomyTermCacheTries.mark();
       TaxonomyTerm term = taxonomyTermCache.getIfPresent(id);
       if(term != null) {
+         taxonomyTermCacheHits.mark();
          return term;
       }
 
@@ -1416,41 +1425,48 @@ public class DB implements MetricSet {
    private final Timer setPostMetaTimer = new Timer();
    private final Timer createTermTimer = new Timer();
    private final Timer selectTermTimer = new Timer();
+
    private final Meter userCacheHits = new Meter();
    private final Meter userCacheTries = new Meter();
+
    private final Meter usernameCacheHits = new Meter();
    private final Meter usernameCacheTries = new Meter();
+
+   private final Meter taxonomyTermCacheHits = new Meter();
+   private final Meter taxonomyTermCacheTries = new Meter();
 
    @Override
    public Map<String, Metric> getMetrics() {
       return ImmutableMap.<String, Metric>builder()
-              .put("option-select", optionSelectTimer)
-              .put("post-terms-select", postTermsSelectTimer)
-              .put("post-terms-set", postTermsSetTimer)
-              .put("post-terms-clear", postTermsClearTimer)
-              .put("taxonomy-term-resolve", taxonomyTermResolveTimer)
-              .put("taxonomy-term-select", selectTaxonomyTermTimer)
-              .put("taxonomy-term-create", createTaxonomyTermTimer)
-              .put("user-create", createUserTimer)
-              .put("user-select", selectUserTimer)
-              .put("user-metadata", userMetadataTimer)
+              .put("select-option", optionSelectTimer)
+              .put("select-post-terms", postTermsSelectTimer)
+              .put("set-post-terms", postTermsSetTimer)
+              .put("clear-post-terms", postTermsClearTimer)
+              .put("resolve-taxonomy-term", taxonomyTermResolveTimer)
+              .put("select-taxonomy-term", selectTaxonomyTermTimer)
+              .put("create-taxonomy-term", createTaxonomyTermTimer)
+              .put("create-user", createUserTimer)
+              .put("select-user", selectUserTimer)
+              .put("select-user-metadata", userMetadataTimer)
               .put("delete-post", deletePostTimer)
-              .put("author-posts-select", selectAuthorPostsTimer)
-              .put("posts-select", selectPostsTimer)
-              .put("post-ids-select", selectPostIdsTimer)
-              .put("post-children-select", selectChildrenTimer)
-              .put("slug-post-select", selectSlugPostsTimer)
-              .put("post-select", selectPostTimer)
-              .put("post-insert", insertPostTimer)
-              .put("pos-meta-set", setPostMetaTimer)
-              .put("post-meta-clear", clearPostMetaTimer)
-              .put("post-meta-select", selectPostMetaTimer)
-              .put("term-create", createTermTimer)
-              .put("term-select", selectTermTimer)
-              .put("user-cache-tries", userCacheTries)
-              .put("user-cache-hits", userCacheHits)
-              .put("username-cache-tries", usernameCacheTries)
-              .put("username-cache-hits", usernameCacheHits)
+              .put("select-author-posts", selectAuthorPostsTimer)
+              .put("select-posts", selectPostsTimer)
+              .put("select-post-ids", selectPostIdsTimer)
+              .put("select-post-children", selectChildrenTimer)
+              .put("select-slug-post", selectSlugPostsTimer)
+              .put("select-post", selectPostTimer)
+              .put("insert-post", insertPostTimer)
+              .put("set-post-meta", setPostMetaTimer)
+              .put("clear-post-meta", clearPostMetaTimer)
+              .put("select-post-meta", selectPostMetaTimer)
+              .put("create-term", createTermTimer)
+              .put("select-term", selectTermTimer)
+              .put("try-user-cache", userCacheTries)
+              .put("hit-user-cache", userCacheHits)
+              .put("try-username-cache", usernameCacheTries)
+              .put("hit-username-cache", usernameCacheHits)
+              .put("try-taxonomy-term-cache", taxonomyTermCacheTries)
+              .put("hit-taxonomy-term-cache", taxonomyTermCacheHits)
               .build();
    }
 

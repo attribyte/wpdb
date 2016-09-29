@@ -43,7 +43,7 @@ public class ImageAttachment extends Post {
     */
    public ImageAttachment(final Post parent, final long id, final String path, final String slug, final String mimeType) {
       super(id, slug, slug, "", "", parent.authorId, parent.author, parent.publishTimestamp, parent.publishTimestamp,
-              parent.status, parent.id, path, 0, ImmutableList.of(), Type.ATTACHMENT, mimeType,
+              Status.INHERIT, parent.id, path, 0, ImmutableList.of(), Type.ATTACHMENT, mimeType,
               ImmutableMap.of(), ImmutableList.of());
    }
 }

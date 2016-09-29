@@ -12,5 +12,6 @@
         <dependency org="org.attribyte" name="acp" rev="0.6.1" conf="compile->default"/>
         <dependency org="io.dropwizard.metrics" name="metrics-core" rev="3.1.2" conf="compile->default"/>
         <dependency org="junit" name="junit" rev="4.11" conf="compile->default"/>
+        <dependency org="mysql" name="mysql-connector-java" rev="5.1.39" conf="compile->default"/>
     </dependencies>
 </ivy-module>

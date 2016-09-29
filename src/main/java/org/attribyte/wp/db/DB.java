@@ -209,6 +209,8 @@ public class DB implements MetricSet {
 
       this.selectChildrenSQL = selectPostSQL + this.postsTableName + " WHERE post_parent=? ORDER BY ID DESC";
 
+      this. deleteChildrenSQL = "DELETE FROM " + this.postsTableName + " WHERE post_parent=?";
+
       this.insertPostWithIdSQL = "INSERT INTO " + postsTableName +
               " (ID, post_author, post_date, post_date_gmt, post_content, post_title, " +
                       "post_excerpt, post_status, post_name, post_modified, post_modified_gmt," +
@@ -241,6 +243,7 @@ public class DB implements MetricSet {
       this.selectPostsTimer = metricSource.newTimer();
       this.selectPostIdsTimer = metricSource.newTimer();
       this.selectChildrenTimer = metricSource.newTimer();
+      this.deleteChildrenTimer = metricSource.newTimer();
       this.selectSlugPostsTimer = metricSource.newTimer();
       this.selectPostTimer = metricSource.newTimer();
       this.insertPostTimer = metricSource.newTimer();
@@ -696,6 +699,28 @@ public class DB implements MetricSet {
          SQLUtil.closeQuietly(conn, stmt, rs);
       }
       return ids;
+   }
+
+   private final String deleteChildrenSQL;
+
+   /**
+    * Deletes all children.
+    * @param parentId The parent post id.
+    * @throws SQLException on database error.
+    */
+   public void deleteChildren(final long parentId) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      Timer.Context ctx = deleteChildrenTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(deleteChildrenSQL);
+         stmt.setLong(1, parentId);
+         stmt.executeUpdate();
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt);
+      }
    }
 
    private final String selectChildrenSQL;
@@ -1590,6 +1615,7 @@ public class DB implements MetricSet {
    private final Timer selectPostsTimer;
    private final Timer selectPostIdsTimer;
    private final Timer selectChildrenTimer;
+   private final Timer deleteChildrenTimer;
    private final Timer selectSlugPostsTimer;
    private final Timer selectPostTimer;
    private final Timer insertPostTimer;
@@ -1628,6 +1654,7 @@ public class DB implements MetricSet {
               .put("select-posts", selectPostsTimer)
               .put("select-post-ids", selectPostIdsTimer)
               .put("select-post-children", selectChildrenTimer)
+              .put("delete-post_children", deleteChildrenTimer)
               .put("select-slug-post", selectSlugPostsTimer)
               .put("select-post", selectPostTimer)
               .put("insert-post", insertPostTimer)

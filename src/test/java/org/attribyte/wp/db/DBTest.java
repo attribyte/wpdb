@@ -146,6 +146,11 @@ public class DBTest {
       List<Post> children = db().selectChildren(testParent.id, false);
       assertNotNull(children);
       assertEquals(1, children.size());
+
+      db().deleteChildren(testParent.id);
+      children = db().selectChildren(testParent.id, false);
+      assertNotNull(children);
+      assertEquals(0, children.size());
    }
 
    @Test

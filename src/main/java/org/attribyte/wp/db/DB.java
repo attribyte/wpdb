@@ -214,19 +214,19 @@ public class DB implements MetricSet {
       this.insertPostWithIdSQL = "INSERT INTO " + postsTableName +
               " (ID, post_author, post_date, post_date_gmt, post_content, post_title, " +
                       "post_excerpt, post_status, post_name, post_modified, post_modified_gmt," +
-                      "post_parent, guid, post_type, to_ping, pinged, post_content_filtered) VALUES " +
-                      "(?,?,?,?,?,?,?,?,?,?,?,?,?,?, '','', '')";
+                      "post_parent, guid, post_type, to_ping, pinged, post_content_filtered, post_mime_type) VALUES " +
+                      "(?,?,?,?,?,?,?,?,?,?,?,?,?,?, '','', '',?)";
 
       this.insertPostSQL = "INSERT INTO " + postsTableName +
               " (post_author, post_date, post_date_gmt, post_content, post_title, " +
                       "post_excerpt, post_status, post_name, post_modified, post_modified_gmt," +
-                      "post_parent, guid, post_type, to_ping, pinged, post_content_filtered) VALUES " +
-                      "(?,?,?,?,?,?,?,?,?,?,?,?,?, '','', '')";
+                      "post_parent, guid, post_type, to_ping, pinged, post_content_filtered, post_mime_type) VALUES " +
+                      "(?,?,?,?,?,?,?,?,?,?,?,?,?, '','', '',?)";
 
       this.updatePostSQL = "UPDATE " + postsTableName +
               " SET post_author=?, post_date=?, post_date_gmt=?, post_content=?, post_title=?, " +
               "post_excerpt=?, post_status=?, post_name=?, post_modified=?, post_modified_gmt=?, post_parent=?, " +
-              "guid=?, post_type=? WHERE ID=?";
+              "guid=?, post_type=?, post_mime_type=? WHERE ID=?";
 
       this.optionSelectTimer = metricSource.newTimer();
       this.postTermsSelectTimer = metricSource.newTimer();
@@ -953,7 +953,8 @@ public class DB implements MetricSet {
          stmt.setLong(11, post.parentId);
          stmt.setString(12, Strings.nullToEmpty(post.guid));
          stmt.setString(13, post.type.toString().toLowerCase());
-         stmt.setLong(14, post.id);
+         stmt.setString(14, post.mimeType != null ? post.mimeType : "");
+         stmt.setLong(15, post.id);
          stmt.executeUpdate();
          return post;
       } finally {
@@ -1003,6 +1004,7 @@ public class DB implements MetricSet {
          stmt.setLong(11, post.parentId);
          stmt.setString(12, Strings.nullToEmpty(post.guid));
          stmt.setString(13, post.type.toString().toLowerCase());
+         stmt.setString(14, post.mimeType != null ? post.mimeType : "");
          stmt.executeUpdate();
          rs = stmt.getGeneratedKeys();
          if(rs.next()) {
@@ -1038,6 +1040,7 @@ public class DB implements MetricSet {
          stmt.setLong(12, post.parentId);
          stmt.setString(13, Strings.nullToEmpty(post.guid));
          stmt.setString(14, post.type.toString().toLowerCase());
+         stmt.setString(15, post.mimeType != null ? post.mimeType : "");
          stmt.executeUpdate();
          return post;
       } finally {

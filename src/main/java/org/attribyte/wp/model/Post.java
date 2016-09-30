@@ -665,6 +665,17 @@ public class Post {
    }
 
    /**
+    * Replaces post content.
+    * @param content The new content.
+    * @return The post with content replaced.
+    */
+   public final Post withContent(final String content) {
+      return new Post(id, slug, title, excerpt, content, authorId, author,
+              publishTimestamp, modifiedTimestamp, status, parentId,
+              guid, commentCount, metadata, type, mimeType, taxonomyTerms, children);
+   }
+
+   /**
     * Adds an id to a post.
     * @param id The id.
     * @return The post with id added.

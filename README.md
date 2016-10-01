@@ -21,6 +21,7 @@ Features
 * Set and delete terms, taxonomy terms and their post associations.
 * Optional taxonomy terms cache.   
 * Select options e.g. site configuration.
+* Select public blogs.
 * Multiple site support.
 * Fully instrumented with [Dropwizard Metrics](http://metrics.dropwizard.io/3.1.0/).
 * JUnit tests.
@@ -30,7 +31,6 @@ Missing Features
 
 * Comments
 * User metadata
-* blog/blog_versions tables.
 
 Requirements
 ------------

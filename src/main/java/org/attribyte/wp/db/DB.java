@@ -28,6 +28,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import org.attribyte.sql.ConnectionSupplier;
 import org.attribyte.util.SQLUtil;
+import org.attribyte.wp.model.Blog;
 import org.attribyte.wp.model.Meta;
 import org.attribyte.wp.model.Paging;
 import org.attribyte.wp.model.Post;
@@ -37,6 +38,7 @@ import org.attribyte.wp.model.Term;
 import org.attribyte.wp.model.User;
 
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -254,6 +256,7 @@ public class DB implements MetricSet {
       this.createTermTimer = metricSource.newTimer();
       this.selectTermTimer = metricSource.newTimer();
       this.resolvePostTimer = metricSource.newTimer();
+      this.selectBlogsTimer = metricSource.newTimer();
       this.userCacheHits = metricSource.newMeter();
       this.userCacheTries = metricSource.newMeter();
       this.usernameCacheHits = metricSource.newMeter();
@@ -1603,6 +1606,66 @@ public class DB implements MetricSet {
       return new Site(siteId, baseURL, title, description, permalinkStructure, defaultCategoryTerm.term);
    }
 
+   private static final String selectBlogSQL = "SELECT blog_id, site_id, domain, path, registered, last_updated FROM wp_blogs";
+
+   /**
+    * Creates a blog from a result set.
+    * @param rs The result set.
+    * @return The blog.
+    * @throws SQLException on database error.
+    */
+   private Blog blogFromResultSet(final ResultSet rs) throws SQLException {
+
+      long registeredTimestamp = 0L;
+      long lastUpdatedTimestamp = 0L;
+
+      try {
+         registeredTimestamp = rs.getTimestamp(5).getTime();
+      } catch(SQLException se) {
+         //Deal with possible java.sql.SQLException: Value '0000-00-00 00:00:00' can not be represented as java.sql.Timestamp
+         registeredTimestamp = 0L;
+      }
+
+      try {
+         lastUpdatedTimestamp = rs.getTimestamp(6).getTime();
+      } catch(SQLException se) {
+         //Deal with possible java.sql.SQLException: Value '0000-00-00 00:00:00' can not be represented as java.sql.Timestamp
+         lastUpdatedTimestamp = 0L;
+      }
+
+      return new Blog(rs.getLong(1), rs.getLong(2), rs.getString(3), rs.getString(4), registeredTimestamp, lastUpdatedTimestamp);
+   }
+
+   private static final String selectPublicBlogsSQL = selectBlogSQL + " WHERE deleted=0 AND public=1";
+
+   /**
+    * Selects all public, enabled blogs.
+    * @return The list of blogs.
+    * @throws SQLException on database error.
+    */
+   public List<Blog> selectPublicBlogs() throws SQLException {
+
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+      List<Blog> blogs = Lists.newArrayListWithExpectedSize(4);
+      Timer.Context ctx = selectBlogsTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(selectPublicBlogsSQL);
+         rs = stmt.executeQuery();
+         while(rs.next()) {
+            blogs.add(blogFromResultSet(rs));
+         }
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+
+      return blogs;
+   }
+
+
    private final Timer optionSelectTimer;
    private final Timer postTermsSelectTimer;
    private final Timer postTermsSetTimer;
@@ -1629,6 +1692,7 @@ public class DB implements MetricSet {
    private final Timer createTermTimer;
    private final Timer selectTermTimer;
    private final Timer resolvePostTimer;
+   private final Timer selectBlogsTimer;
 
    private final Meter userCacheHits;
    private final Meter userCacheTries;
@@ -1663,6 +1727,7 @@ public class DB implements MetricSet {
               .put("insert-post", insertPostTimer)
               .put("update-post", updatePostTimer)
               .put("resolve-post", resolvePostTimer)
+              .put("select-blogs", selectBlogsTimer)
               .put("set-post-meta", setPostMetaTimer)
               .put("clear-post-meta", clearPostMetaTimer)
               .put("select-post-meta", selectPostMetaTimer)

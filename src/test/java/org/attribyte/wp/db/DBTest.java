@@ -20,6 +20,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import org.attribyte.api.InitializationException;
 import org.attribyte.util.StringUtil;
+import org.attribyte.wp.model.Blog;
 import org.attribyte.wp.model.Meta;
 import org.attribyte.wp.model.Paging;
 import org.attribyte.wp.model.Post;
@@ -405,6 +406,13 @@ public class DBTest {
       assertNotNull(terms);
       assertEquals(2, terms.size());
 
+   }
+
+   @Test
+   public void selectBlogs() throws Exception {
+      List<Blog> blogs = db().selectPublicBlogs();
+      assertNotNull(blogs);
+      assertTrue(blogs.size() > 0);
    }
 
    /**

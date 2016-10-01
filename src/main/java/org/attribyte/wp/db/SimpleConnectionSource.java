@@ -16,7 +16,6 @@ package org.attribyte.wp.db;
 
 import org.attribyte.api.InitializationException;
 import org.attribyte.sql.ConnectionSupplier;
-import org.attribyte.util.InitUtil;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -29,60 +28,60 @@ import java.util.Properties;
 public class SimpleConnectionSource implements ConnectionSupplier {
 
    /**
-    * Creates a simple conneciton source.
+    * Creates a simple connection source.
     * @param props The configuration properties.
     * @throws InitializationException on initialization error.
     */
    public SimpleConnectionSource(final Properties props) throws InitializationException {
-      init(props);
-   }
-
-   String host;
-   String db;
-   String user;
-   String password;
-   String port;
-   String driver;
-   String connectionString;
-
-   private void init(final Properties props) throws InitializationException {
-
-      InitUtil initProps = new InitUtil("", props);
-
-      this.user = initProps.getProperty("user", "");
-      this.password = initProps.getProperty("password", "");
-      this.driver = initProps.getProperty("driver", "com.mysql.jdbc.Driver");
+      this.user = props.getProperty("user", "");
+      this.password = props.getProperty("password", "");
+      String driver = props.getProperty("driver", "com.mysql.jdbc.Driver");
 
       try {
-         Class.forName(this.driver);
+         Class.forName(driver);
       } catch(Exception e) {
-         throw new InitializationException("Unable to initialize JDBC driver", e);
+         throw new InitializationException(String.format("Unable to initialize JDBC driver '%s'", driver), e);
       }
 
-      if(initProps.getProperty("connectionString") == null) {
-         this.host = initProps.getProperty("host", null);
-         this.port = initProps.getProperty("port", "3306");
-         this.db = initProps.getProperty("db", null);
+      final String host;
+
+      if(props.getProperty("connectionString") == null) {
+         host = props.getProperty("host", null);
+         String port = props.getProperty("port", "3306");
+         String db = props.getProperty("db", null);
 
          if(host == null) {
-            initProps.throwRequiredException("host");
+            throw new InitializationException("A 'host' property must be specified");
          }
 
          if(db == null) {
-            initProps.throwRequiredException("db");
+            throw new InitializationException("A 'db' property must be specified");
          }
-
          this.connectionString = "jdbc:mysql://" + host + ":" + port + "/" + db;
       } else {
-         this.connectionString = initProps.getProperty("connectionString");
+         this.connectionString = props.getProperty("connectionString");
       }
    }
 
+   @Override
    public Connection getConnection() throws SQLException {
-      if(user != null && password != null) {
-         return DriverManager.getConnection(connectionString, user, password);
-      } else {
-         return DriverManager.getConnection(connectionString);
-      }
+      return user != null && password != null ?
+              DriverManager.getConnection(connectionString, user, password) :
+              DriverManager.getConnection(connectionString);
    }
+
+   /**
+    * The connection string.
+    */
+   private final String connectionString;
+
+   /**
+    * The connection username.
+    */
+   private final String user;
+
+   /**
+    * The connection password.
+    */
+   private final String password;
 }

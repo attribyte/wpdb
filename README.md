@@ -47,8 +47,9 @@ Build with [Ant](http://ant.apache.org/) and [Ivy](http://ant.apache.org/ivy/)
 * Build and retrieve all dependencies: `ant full-dist`
 * Build and run tests: `ant -Ddb=[database] -Ddbuser=[user] -Ddbpass=[password] -Ddbhost=[host] test`
 
-###License
+License
+-------
 
 [Apache License Version 2.0](http://www.apache.org/licenses/)
 
-Copyright 2016 [Attribyte, LLC](https://attribyte.com)
+&copy; 2016, [Attribyte, LLC](https://attribyte.com)

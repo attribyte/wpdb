@@ -29,9 +29,8 @@ Missing Features
 ----------------
 
 * Comments
-* Complete user metadata
-* Blog/versions tables.
-
+* User metadata
+* blog/blog_versions tables.
 
 Requirements
 ------------
@@ -41,5 +40,4 @@ Requirements
 Build
 -----
 
-Build requires [Ant](http://ant.apache.org/) and [Ivy](http://ant.apache.org/ivy/) for
-resolving dependencies.
+Build with [Ant](http://ant.apache.org/) and [Ivy](http://ant.apache.org/ivy/) for dependency resolution.

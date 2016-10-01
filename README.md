@@ -8,10 +8,10 @@ Features
 * Create, select, update and delete users.
 * Optional user cache.
 * Insert, update and delete posts.
-* Posts may be inserted with a known `ID` or with it auto-generated.
-* Select posts by id
-* Select posts by author
-* Select posts by "slug"
+* Posts may be inserted with a known `ID` or auto-generated.
+* Select posts by id.
+* Select posts by author.
+* Select posts by "slug."
 * Select children for posts.
 * Select posts sorted by publish time, last modified (inefficient out-of-box), id.
 * Select posts associated with one or more taxonomy terms.
@@ -21,8 +21,17 @@ Features
 * Set and delete terms, taxonomy terms and their post associations.
 * Optional taxonomy terms cache.   
 * Select options e.g. site configuration.
-* Fully instrumented with [Dropwizard Metrics](http://metrics.dropwizard.io/3.1.0/)
-* Tests. 
+* Multiple site support.
+* Fully instrumented with [Dropwizard Metrics](http://metrics.dropwizard.io/3.1.0/).
+* JUnit tests.
+ 
+Missing Features
+----------------
+
+* Comments
+* Complete user metadata
+* Blog/versions tables.
+
 
 Requirements
 ------------

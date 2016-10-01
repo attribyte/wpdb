@@ -46,11 +46,11 @@ public class DBTest {
    protected DB db() throws InitializationException {
       if(isInit.compareAndSet(false, true)) {
          Properties props = new Properties();
-         props.put("user", "root");
-         props.put("password", "");
+         props.put("user", System.getProperty("dbuser", "root"));
+         props.put("password", System.getProperty("dbpass", ""));
          props.put("driver", "com.mysql.jdbc.Driver");
-         props.put("host", "localhost");
-         props.put("db", "wordpress_test");
+         props.put("host", System.getProperty("dbhost", "localhost"));
+         props.put("db", System.getProperty("db", "wordpress_test"));
          _db = new DB(new SimpleConnectionSource(props), 1, ImmutableSet.of("test_taxonomy_with_cache"),
                  Duration.ofMinutes(30), Duration.ofMinutes(30));
       }

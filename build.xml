@@ -1,19 +1,17 @@
 <project name="wpdb" default="dist" xmlns:ivy="antlib:org.apache.ivy.ant">
 
-    <description>Build the Attribyte, LLC Wordpress DB Project</description>
+    <description>Build the Attribyte, LLC WP DB Project</description>
 
     <property name="jdkVersion" value="1.8" />
-
     <property name="src" location="src" />
     <property name="build" location="build" />
+    <property name="build-test" location="build-test" />
     <property name="dist" location="dist" />
-
-
     <property name="groupId" value="org.attribyte" />
     <property name="artifactId" value="wpdb" />
     <property name="version" value="1.0.0" />
-
     <property name="jar" value="${dist}/lib/${artifactId}-${version}.jar" />
+    <property name="test-jar" value="${dist}/lib/${artifactId}-test-${version}.jar" />
     <property name="javadoc-jar" value="${dist}/lib/${artifactId}-${version}-javadoc.jar" />
     <property name="sources-jar" value="${dist}/lib/${artifactId}-${version}-sources.jar" />
 
@@ -22,15 +20,30 @@
         <pathelement location="${build}"/>
     </path>
 
-    <target name="resolve" description="Use ivy to resolve classpaths">
+    <path id="classpath-test">
+        <fileset refid="ivy.fileset"/>
+        <pathelement location="${build}"/>
+        <pathelement location="${build-test}"/>
+    </path>
+
+    <target name="resolve" description="Use ivy to resolve classpath">
         <ivy:resolve file="ivy.xml" conf="compile"/>
         <ivy:cachefileset setid="ivy.fileset" conf="compile"/>
+    </target>
+
+    <target name="resolve-test" description="Use ivy to resolve classpath for tests">
+        <ivy:resolve file="ivy.xml" conf="test"/>
+        <ivy:cachefileset setid="ivy.fileset" conf="test"/>
     </target>
 
     <target name="init" depends="resolve">
         <mkdir dir="${build}"/>
         <mkdir dir="${dist}/lib"/>
         <mkdir dir="${dist}/doc/javadoc"/>
+    </target>
+
+    <target name="init-test" depends="init,resolve-test">
+        <mkdir dir="${build-test}"/>
     </target>
 
     <target name="compile" depends="init" description="Compiles the source">
@@ -40,17 +53,43 @@
         </javac>
     </target>
 
+    <target name="compile-test" depends="init-test,compile" description="Compiles the test source">
+        <javac includeantruntime="false" srcdir="${src}/test/java" destdir="${build-test}" debug="on">
+            <classpath refid="classpath-test"/>
+        </javac>
+    </target>
+
+    <!--
+        ant -Ddb=[database] -Ddbuser=[user] -Ddbpass=[password] -Ddbhost=[host] test
+    -->
+    <target name="test" depends="compile-test" description="Run tests - requires db,dbhost,dbuser,dbpass parameters">
+        <junit printsummary="withOutAndErr" haltonfailure="no">
+            <sysproperty key="db" value="${db}"/>
+            <sysproperty key="dbhost" value="${dbhost}"/>
+            <sysproperty key="dbuser" value="${dbuser}"/>
+            <sysproperty key="dbpass" value="${dbpass}"/>
+            <classpath refid="classpath-test" />
+            <formatter type="plain" />
+            <batchtest fork="yes">
+                <fileset dir="${src}/test/java">
+                    <include name="**/*Test*.java" />
+                </fileset>
+            </batchtest>
+        </junit>
+    </target>
+
     <target name="dist" depends="compile" description="Creates the distribution">
         <jar jarfile="${jar}" basedir="${build}"/>
     </target>
 
-    <target name="full-dist" depends="dist" description="Creates the distribution with a copy of all dependencies">
+    <target name="full-dist" depends="dist" description="Creates the distribution with all dependencies">
         <ivy:retrieve pattern="${dist}/extlib/[organisation]-[artifact]-[revision].[ext]"
                       conf="compile"/>
     </target>
 
     <target name="clean" description="Removes all build files">
         <delete dir="${build}"/>
+        <delete dir="${build-test}"/>
         <delete dir="${dist}"/>
     </target>
 

@@ -40,4 +40,9 @@ Requirements
 Build
 -----
 
-Build with [Ant](http://ant.apache.org/) and [Ivy](http://ant.apache.org/ivy/) for dependency resolution.
+Build with [Ant](http://ant.apache.org/) and [Ivy](http://ant.apache.org/ivy/)
+
+* Build: `ant dist`
+* Build docs: `ant javadoc`
+* Build and retrieve all dependencies: `ant full-dist`
+* Build and run tests: `ant -Ddb=[database] -Ddbuser=[user] -Ddbpass=[password] -Ddbhost=[host] test`

@@ -15,6 +15,7 @@ Features
 * Select children for posts.
 * Select posts sorted by publish time, last modified (inefficient out-of-box), id.
 * Select posts associated with one or more taxonomy terms.
+* Select modified posts without skip due to long sequences with identical modified times.
 * Page posts with start, limit and timestamp constraints.
 * Set and delete post children, e.g. attachments.
 * Set and delete post metadata.

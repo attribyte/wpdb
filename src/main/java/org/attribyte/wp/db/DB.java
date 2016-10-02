@@ -38,7 +38,6 @@ import org.attribyte.wp.model.Term;
 import org.attribyte.wp.model.User;
 
 import java.sql.Connection;
-import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -230,6 +229,10 @@ public class DB implements MetricSet {
               "post_excerpt=?, post_status=?, post_name=?, post_modified=?, post_modified_gmt=?, post_parent=?, " +
               "guid=?, post_type=?, post_mime_type=? WHERE ID=?";
 
+
+      this.selectModPostsSQL = selectPostSQL + postsTableName +
+              " WHERE post_modified > ? OR (post_modified=? AND ID > ?) ORDER BY post_modified ASC, ID ASC LIMIT ?";
+
       this.optionSelectTimer = metricSource.newTimer();
       this.postTermsSelectTimer = metricSource.newTimer();
       this.postTermsSetTimer = metricSource.newTimer();
@@ -243,6 +246,7 @@ public class DB implements MetricSet {
       this.deletePostTimer = metricSource.newTimer();
       this.selectAuthorPostsTimer = metricSource.newTimer();
       this.selectPostsTimer = metricSource.newTimer();
+      this.selectModPostsTimer = metricSource.newTimer();
       this.selectPostIdsTimer = metricSource.newTimer();
       this.selectChildrenTimer = metricSource.newTimer();
       this.deleteChildrenTimer = metricSource.newTimer();
@@ -545,6 +549,56 @@ public class DB implements MetricSet {
             stmt.setInt(2, paging.start);
             stmt.setInt(3, paging.limit);
          }
+         rs = stmt.executeQuery();
+         while(rs.next()) {
+            builders.add(postFromResultSet(rs));
+         }
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+
+      List<Post> posts = Lists.newArrayListWithExpectedSize(builders.size());
+      for(Post.Builder builder : builders) {
+         if(withResolve) {
+            posts.add(resolve(builder).build());
+         } else {
+            posts.add(builder.build());
+         }
+      }
+
+      return posts;
+   }
+
+   private final String selectModPostsSQL;
+
+   /**
+    * Selects recently modified posts, in ascending order after a specified timestamp and id.
+    * @param startTimestamp The timestamp after which posts were modified.
+    * @param startId The start id. Posts that have timestamp that match {@code startTimestamp} exactly must if ids greater.
+    * @param limit The maximum number of posts returned.
+    * @return The list of posts.
+    * @param withResolve Should associated users, etc be resolved?
+    * @throws SQLException on database error.
+    */
+   public List<Post> selectModifiedPosts(final long startTimestamp,
+                                         final long startId,
+                                         final int limit,
+                                         final boolean withResolve) throws SQLException {
+
+      List<Post.Builder> builders = Lists.newArrayListWithExpectedSize(limit < 1024 ? limit : 1024);
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+      Timer.Context ctx = selectModPostsTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(selectModPostsSQL);
+         Timestamp ts = new Timestamp(startTimestamp);
+         stmt.setTimestamp(1, ts);
+         stmt.setTimestamp(2, ts);
+         stmt.setLong(3, startId);
+         stmt.setInt(4, limit);
          rs = stmt.executeQuery();
          while(rs.next()) {
             builders.add(postFromResultSet(rs));
@@ -1679,6 +1733,7 @@ public class DB implements MetricSet {
    private final Timer deletePostTimer;
    private final Timer selectAuthorPostsTimer;
    private final Timer selectPostsTimer;
+   private final Timer selectModPostsTimer;
    private final Timer selectPostIdsTimer;
    private final Timer selectChildrenTimer;
    private final Timer deleteChildrenTimer;
@@ -1719,6 +1774,7 @@ public class DB implements MetricSet {
               .put("delete-post", deletePostTimer)
               .put("select-author-posts", selectAuthorPostsTimer)
               .put("select-posts", selectPostsTimer)
+              .put("select-mod-posts", selectModPostsTimer)
               .put("select-post-ids", selectPostIdsTimer)
               .put("select-post-children", selectChildrenTimer)
               .put("delete-post_children", deleteChildrenTimer)

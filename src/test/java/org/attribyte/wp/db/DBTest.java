@@ -252,7 +252,25 @@ public class DBTest {
       assertNotNull(posts);
       assertEquals(2, posts.size());
       assertTrue(posts.get(0).id < posts.get(1).id);
+   }
 
+   @Test
+   public void modPosts() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      db().deletePost(1000L);
+      db().deletePost(1001L);
+      Post testPost0 = createTestPost(createdUser, 1000L);
+      Post testPost1 = createTestPost(createdUser, 1001L);
+      db().insertPost(testPost0, TimeZone.getDefault());
+      db().insertPost(testPost1, TimeZone.getDefault());
+      List<Post> posts = db().selectModifiedPosts(0L, 0L, 2, false);
+      assertNotNull(posts);
+      assertEquals(2, posts.size());
+
+      posts = db().selectModifiedPosts(System.currentTimeMillis() + 2000L, testPost1.id, 2, false);
+      assertEquals(0, posts.size());
    }
 
    @Test

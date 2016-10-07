@@ -837,6 +837,17 @@ public class Post {
    public final ImmutableList<Post> children;
 
    /**
+    * An immutable list of terms associated with this post from a specified taxonomy.
+    * @param taxonomy The taxonomy.
+    * @return The list of terms.
+    */
+   public final ImmutableList<TaxonomyTerm> terms(final String taxonomy) {
+      ImmutableList<TaxonomyTerm> terms = taxonomyTerms.get(taxonomy);
+      return terms != null ? terms : ImmutableList.of();
+   }
+
+
+   /**
     * An immutable list of tags associated with this post.
     * @return The list of tags.
     */

@@ -231,7 +231,11 @@ public class DB implements MetricSet {
 
 
       this.selectModPostsSQL = selectPostSQL + postsTableName +
-              " WHERE post_modified > ? OR (post_modified=? AND ID > ?) ORDER BY post_modified ASC, ID ASC LIMIT ?";
+              " WHERE post_modified_gmt > ? OR (post_modified_gmt=? AND ID > ?) ORDER BY post_modified_gmt ASC, ID ASC LIMIT ?";
+
+      this.selectModPostsWithTypeSQL = selectPostSQL + postsTableName +
+              " WHERE post_type=? AND (post_modified_gmt > ? OR (post_modified_gmt=? AND ID > ?)) ORDER BY post_modified_gmt ASC, ID ASC LIMIT ?";
+
 
       this.optionSelectTimer = metricSource.newTimer();
       this.postTermsSelectTimer = metricSource.newTimer();
@@ -493,13 +497,19 @@ public class DB implements MetricSet {
       Post.Builder post = Post.newBuilder();
       post.setId(rs.getLong(1));
       post.setAuthorId(rs.getLong(2));
-      post.setPublishTimestamp(rs.getTimestamp(3).getTime());
+
+      Timestamp ts = rs.getTimestamp(3);
+      post.setPublishTimestamp(ts != null ? ts.getTime() : 0L);
+
       post.setContent(Strings.emptyToNull(rs.getString(4)));
       post.setTitle(Strings.emptyToNull(rs.getString(5)));
       post.setExcerpt(Strings.emptyToNull(rs.getString(6)));
       post.setStatus(Post.Status.fromString(rs.getString(7)));
       post.setSlug(Strings.emptyToNull(rs.getString(8)));
-      post.setModifiedTimestamp(rs.getTimestamp(9).getTime());
+
+      ts = rs.getTimestamp(9);
+      post.setModifiedTimestamp(ts != null ? ts.getTime() : 0L);
+
       post.setParentId(rs.getLong(10));
       post.setGUID(Strings.emptyToNull(rs.getString(11)));
       post.setType(Post.Type.fromString(rs.getString(12)));
@@ -571,9 +581,11 @@ public class DB implements MetricSet {
    }
 
    private final String selectModPostsSQL;
+   private final String selectModPostsWithTypeSQL;
 
    /**
     * Selects recently modified posts, in ascending order after a specified timestamp and id.
+    * @param type The post type. May be {@code null} for all types.
     * @param startTimestamp The timestamp after which posts were modified.
     * @param startId The start id. Posts that have timestamp that match {@code startTimestamp} exactly must if ids greater.
     * @param limit The maximum number of posts returned.
@@ -581,7 +593,8 @@ public class DB implements MetricSet {
     * @param withResolve Should associated users, etc be resolved?
     * @throws SQLException on database error.
     */
-   public List<Post> selectModifiedPosts(final long startTimestamp,
+   public List<Post> selectModifiedPosts(final Post.Type type,
+                                         final long startTimestamp,
                                          final long startId,
                                          final int limit,
                                          final boolean withResolve) throws SQLException {
@@ -593,12 +606,23 @@ public class DB implements MetricSet {
       Timer.Context ctx = selectModPostsTimer.time();
       try {
          conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(selectModPostsSQL);
          Timestamp ts = new Timestamp(startTimestamp);
-         stmt.setTimestamp(1, ts);
-         stmt.setTimestamp(2, ts);
-         stmt.setLong(3, startId);
-         stmt.setInt(4, limit);
+
+         if(type == null) {
+            stmt = conn.prepareStatement(selectModPostsSQL);
+            stmt.setTimestamp(1, ts);
+            stmt.setTimestamp(2, ts);
+            stmt.setLong(3, startId);
+            stmt.setInt(4, limit);
+         } else {
+            stmt = conn.prepareStatement(selectModPostsWithTypeSQL);
+            stmt.setString(1, type.toString().toLowerCase());
+            stmt.setTimestamp(2, ts);
+            stmt.setTimestamp(3, ts);
+            stmt.setLong(4, startId);
+            stmt.setInt(5, limit);
+         }
+
          rs = stmt.executeQuery();
          while(rs.next()) {
             builders.add(postFromResultSet(rs));

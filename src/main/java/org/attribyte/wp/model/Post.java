@@ -43,6 +43,11 @@ public class Post {
       DRAFT,
 
       /**
+       * Post is auto-draft.
+       */
+      AUTO_DRAFT,
+
+      /**
        * Post is pending publication.
        */
       PENDING,
@@ -74,7 +79,8 @@ public class Post {
        */
       public static Status fromString(final String str) {
          switch(Strings.nullToEmpty(str).trim().toLowerCase()) {
-            case "draft" :return DRAFT;
+            case "draft" : return DRAFT;
+            case "auto-draft" : return AUTO_DRAFT;
             case "pending" : return PENDING;
             case "private" : return PRIVATE;
             case "publish" : return PUBLISH;

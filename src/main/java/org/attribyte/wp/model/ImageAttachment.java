@@ -23,6 +23,14 @@ import com.google.common.collect.ImmutableMap;
 public class ImageAttachment extends Post {
 
    /**
+    * Creates an image attachment from a post.
+    * @param post The post.
+    */
+   public ImageAttachment(Post post) {
+      super(post);
+   }
+
+   /**
     * Creates an image attachment with unassigned id.
     * @param parent The parent post.
     * @param path The image path.
@@ -45,5 +53,13 @@ public class ImageAttachment extends Post {
       super(id, slug, slug, "", "", parent.authorId, parent.author, parent.publishTimestamp, parent.publishTimestamp,
               Status.INHERIT, parent.id, path, 0, ImmutableList.of(), Type.ATTACHMENT, mimeType,
               ImmutableMap.of(), ImmutableList.of());
+   }
+
+   /**
+    * Gets the image path.
+    * @return The image path.
+    */
+   public String path() {
+      return guid;
    }
 }

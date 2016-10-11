@@ -627,6 +627,17 @@ public class Post {
       return new Builder(post);
    }
 
+   /**
+    * Creates a copy of a post.
+    * @param other The other post.
+    */
+   protected Post(final Post other) {
+      this(other.id, other.slug, other.title, other.excerpt, other.content,
+              other.authorId, other.author, other.publishTimestamp, other.modifiedTimestamp,
+              other.status, other.parentId, other.guid, other.commentCount,
+              other.metadata, other.type, other.mimeType, other.taxonomyTerms, other.children);
+   }
+
    Post(final long id, final String slug, final String title, final String excerpt, final String content,
         final long authorId, final User author, final long publishTimestamp, final long modifiedTimestamp,
         final Status status, final long parentId, final String guid, final int commentCount,

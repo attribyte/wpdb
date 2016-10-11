@@ -208,7 +208,7 @@ public class DB implements MetricSet {
 
       this.selectPostsBySlugSQL = selectPostSQL + this.postsTableName + " WHERE post_name=? ORDER BY ID DESC";
 
-      this.selectChildrenSQL = selectPostSQL + this.postsTableName + " WHERE post_parent=? ORDER BY ID DESC";
+      this.selectChildrenSQL = selectPostSQL + this.postsTableName + " WHERE post_parent=? ORDER BY ID ASC";
 
       this. deleteChildrenSQL = "DELETE FROM " + this.postsTableName + " WHERE post_parent=?";
 

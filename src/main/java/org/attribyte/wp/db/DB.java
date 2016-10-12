@@ -196,10 +196,10 @@ public class DB implements MetricSet {
 
 
       this.selectModPostsSQL = selectPostSQL + postsTableName +
-              " WHERE post_modified_gmt > ? OR (post_modified_gmt=? AND ID > ?) ORDER BY post_modified_gmt ASC, ID ASC LIMIT ?";
+              " WHERE post_modified > ? OR (post_modified=? AND ID > ?) ORDER BY post_modified ASC, ID ASC LIMIT ?";
 
       this.selectModPostsWithTypeSQL = selectPostSQL + postsTableName +
-              " WHERE post_type=? AND (post_modified_gmt > ? OR (post_modified_gmt=? AND ID > ?)) ORDER BY post_modified_gmt ASC, ID ASC LIMIT ?";
+              " WHERE post_type=? AND (post_modified > ? OR (post_modified=? AND ID > ?)) ORDER BY post_modified ASC, ID ASC LIMIT ?";
 
       this.metrics = new Metrics(metricSource);
    }
@@ -415,7 +415,7 @@ public class DB implements MetricSet {
    }
 
    private static final String selectPostSQL =
-           "SELECT ID, post_author, post_date_gmt, post_content, post_title, post_excerpt, post_status, post_name, post_modified_gmt," +
+           "SELECT ID, post_author, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified," +
                    "post_parent, guid, post_type, post_mime_type FROM ";
 
    /**

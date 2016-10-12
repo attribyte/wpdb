@@ -97,6 +97,9 @@ public class DBTest {
       Post createdPost = db().insertPost(testPost, TimeZone.getDefault());
       assertNotNull(createdPost);
       assertTrue(createdPost.id > 0L);
+      Post.Builder checkPost = db().selectPost(createdPost.id);
+      assertEquals(testPost.publishTimestamp, checkPost.getPublishTimestamp());
+      assertEquals(testPost.modifiedTimestamp, checkPost.getModifiedTimestamp());
    }
 
    @Test
@@ -462,6 +465,8 @@ public class DBTest {
          id = Math.abs(rnd.nextInt());
       }
 
+      long currTime = (System.currentTimeMillis()/1000L) * 1000L;
+
       builder.setId(id);
       builder.setTitle("Test title " + rndStr);
       builder.setContent("Test content " + rndStr);
@@ -469,8 +474,8 @@ public class DBTest {
       builder.setExcerpt("Text excerpt " + rndStr);
       builder.setSlug(rndStr);
       builder.setGUID("http://localhost?id="+rndStr);
-      builder.setPublishTimestamp(System.currentTimeMillis());
-      builder.setModifiedTimestamp(System.currentTimeMillis());
+      builder.setPublishTimestamp(currTime);
+      builder.setModifiedTimestamp(currTime);
       builder.setStatus(Post.Status.PUBLISH);
       builder.setType(Post.Type.POST);
       return builder.build();

@@ -15,7 +15,6 @@
 package org.attribyte.wp.db;
 
 
-import com.codahale.metrics.Meter;
 import com.codahale.metrics.Metric;
 import com.codahale.metrics.MetricSet;
 import com.codahale.metrics.Timer;
@@ -57,40 +56,6 @@ import static org.attribyte.wp.Util.CATEGORY_TAXONOMY;
 import static org.attribyte.wp.Util.slugify;
 
 public class DB implements MetricSet {
-
-   /**
-    * A source for metrics.
-    * <p>
-    *    Allows caller to replace implementation (e.g. use HDR timer).
-    * </p>
-    */
-   public interface MetricSource {
-
-      /**
-       * Creates a new timer.
-       * @return The new timer.
-       */
-      public Timer newTimer();
-
-      /**
-       * Creates a new meter.
-       * @return The new meter.
-       */
-      public Meter newMeter();
-
-
-      public static final MetricSource DEFAULT = new MetricSource() {
-         @Override
-         public Timer newTimer() {
-            return new Timer();
-         }
-
-         @Override
-         public Meter newMeter() {
-            return new Meter();
-         }
-      };
-   }
 
    /**
     * Creates a database with the default metric source.
@@ -236,41 +201,7 @@ public class DB implements MetricSet {
       this.selectModPostsWithTypeSQL = selectPostSQL + postsTableName +
               " WHERE post_type=? AND (post_modified_gmt > ? OR (post_modified_gmt=? AND ID > ?)) ORDER BY post_modified_gmt ASC, ID ASC LIMIT ?";
 
-
-      this.optionSelectTimer = metricSource.newTimer();
-      this.postTermsSelectTimer = metricSource.newTimer();
-      this.postTermsSetTimer = metricSource.newTimer();
-      this.postTermsClearTimer = metricSource.newTimer();
-      this.taxonomyTermResolveTimer = metricSource.newTimer();
-      this.selectTaxonomyTermTimer = metricSource.newTimer();
-      this.createTaxonomyTermTimer = metricSource.newTimer();
-      this.createUserTimer = metricSource.newTimer();
-      this.selectUserTimer = metricSource.newTimer();
-      this.userMetadataTimer = metricSource.newTimer();
-      this.deletePostTimer = metricSource.newTimer();
-      this.selectAuthorPostsTimer = metricSource.newTimer();
-      this.selectPostsTimer = metricSource.newTimer();
-      this.selectModPostsTimer = metricSource.newTimer();
-      this.selectPostIdsTimer = metricSource.newTimer();
-      this.selectChildrenTimer = metricSource.newTimer();
-      this.deleteChildrenTimer = metricSource.newTimer();
-      this.selectSlugPostsTimer = metricSource.newTimer();
-      this.selectPostTimer = metricSource.newTimer();
-      this.insertPostTimer = metricSource.newTimer();
-      this.updatePostTimer = metricSource.newTimer();
-      this.clearPostMetaTimer = metricSource.newTimer();
-      this.selectPostMetaTimer = metricSource.newTimer();
-      this.setPostMetaTimer = metricSource.newTimer();
-      this.createTermTimer = metricSource.newTimer();
-      this.selectTermTimer = metricSource.newTimer();
-      this.resolvePostTimer = metricSource.newTimer();
-      this.selectBlogsTimer = metricSource.newTimer();
-      this.userCacheHits = metricSource.newMeter();
-      this.userCacheTries = metricSource.newMeter();
-      this.usernameCacheHits = metricSource.newMeter();
-      this.usernameCacheTries = metricSource.newMeter();
-      this.taxonomyTermCacheHits = metricSource.newMeter();
-      this.taxonomyTermCacheTries = metricSource.newMeter();
+      this.metrics = new Metrics(metricSource);
    }
 
    private static final String createUserSQL =
@@ -297,7 +228,7 @@ public class DB implements MetricSet {
 
       String username = user.username.length() < 60 ? user.username : user.username.substring(0, 60);
 
-      Timer.Context ctx = createUserTimer.time();
+      Timer.Context ctx = metrics.createUserTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(createUserSQL, Statement.RETURN_GENERATED_KEYS);
@@ -350,7 +281,7 @@ public class DB implements MetricSet {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-      Timer.Context ctx = selectUserTimer.time();
+      Timer.Context ctx = metrics.selectUserTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectUserByUsernameSQL);
@@ -375,7 +306,7 @@ public class DB implements MetricSet {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-      Timer.Context ctx = selectUserTimer.time();
+      Timer.Context ctx = metrics.selectUserTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectUserByIdSQL);
@@ -395,10 +326,10 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public User resolveUser(final long userId) throws SQLException {
-      userCacheTries.mark();
+      metrics.userCacheTries.mark();
       User user = userCache.getIfPresent(userId);
       if(user != null) {
-         userCacheHits.mark();
+         metrics.userCacheHits.mark();
          return user;
       } else {
          user = selectUser(userId);
@@ -416,10 +347,10 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public User resolveUser(final String username) throws SQLException {
-      usernameCacheTries.mark();
+      metrics.usernameCacheTries.mark();
       User user = usernameCache.getIfPresent(username);
       if(user != null) {
-         usernameCacheHits.mark();
+         metrics.usernameCacheHits.mark();
          return user;
       } else {
          user = selectUser(username);
@@ -444,7 +375,7 @@ public class DB implements MetricSet {
       PreparedStatement stmt = null;
       ResultSet rs = null;
       List<Meta> meta = Lists.newArrayListWithExpectedSize(16);
-      Timer.Context ctx = userMetadataTimer.time();
+      Timer.Context ctx = metrics.userMetadataTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectUserMetaSQL);
@@ -471,7 +402,7 @@ public class DB implements MetricSet {
       clearPostMeta(postId);
       Connection conn = null;
       PreparedStatement stmt = null;
-      Timer.Context ctx = deletePostTimer.time();
+      Timer.Context ctx = metrics.deletePostTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(deletePostIdSQL);
@@ -545,7 +476,7 @@ public class DB implements MetricSet {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-      Timer.Context ctx = selectAuthorPostsTimer.time();
+      Timer.Context ctx = metrics.selectAuthorPostsTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(sql.toString());
@@ -603,7 +534,7 @@ public class DB implements MetricSet {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-      Timer.Context ctx = selectModPostsTimer.time();
+      Timer.Context ctx = metrics.selectModPostsTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          Timestamp ts = new Timestamp(startTimestamp);
@@ -674,7 +605,7 @@ public class DB implements MetricSet {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-      Timer.Context ctx = selectPostsTimer.time();
+      Timer.Context ctx = metrics.selectPostsTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(sql.toString());
@@ -756,7 +687,7 @@ public class DB implements MetricSet {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-      Timer.Context ctx = selectPostIdsTimer.time();
+      Timer.Context ctx = metrics.selectPostIdsTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(sql.toString());
@@ -792,7 +723,7 @@ public class DB implements MetricSet {
    public void deleteChildren(final long parentId) throws SQLException {
       Connection conn = null;
       PreparedStatement stmt = null;
-      Timer.Context ctx = deleteChildrenTimer.time();
+      Timer.Context ctx = metrics.deleteChildrenTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(deleteChildrenSQL);
@@ -820,7 +751,7 @@ public class DB implements MetricSet {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-      Timer.Context ctx = selectChildrenTimer.time();
+      Timer.Context ctx = metrics.selectChildrenTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectChildrenSQL);
@@ -910,7 +841,7 @@ public class DB implements MetricSet {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-      Timer.Context ctx = selectSlugPostsTimer.time();
+      Timer.Context ctx = metrics.selectSlugPostsTimer.time();
 
       try {
          conn = connectionSupplier.getConnection();
@@ -944,7 +875,7 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public Post.Builder resolve(final Post.Builder post) throws SQLException {
-      Timer.Context ctx = resolvePostTimer.time();
+      Timer.Context ctx = metrics.resolvePostTimer.time();
       try {
          User author = resolveUser(post.getAuthorId());
          if(author != null) {
@@ -985,7 +916,7 @@ public class DB implements MetricSet {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-      Timer.Context ctx = selectPostTimer.time();
+      Timer.Context ctx = metrics.selectPostTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectPostSQL + postsTableName + " WHERE ID=?");
@@ -1017,7 +948,7 @@ public class DB implements MetricSet {
       int offset = tz.getOffset(post.publishTimestamp);
       Connection conn = null;
       PreparedStatement stmt = null;
-      Timer.Context ctx = updatePostTimer.time();
+      Timer.Context ctx = metrics.updatePostTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(updatePostSQL);
@@ -1068,7 +999,7 @@ public class DB implements MetricSet {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-      Timer.Context ctx = insertPostTimer.time();
+      Timer.Context ctx = metrics.insertPostTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(insertPostSQL, Statement.RETURN_GENERATED_KEYS);
@@ -1103,7 +1034,7 @@ public class DB implements MetricSet {
       int offset = tz.getOffset(post.publishTimestamp);
       Connection conn = null;
       PreparedStatement stmt = null;
-      Timer.Context ctx = insertPostTimer.time();
+      Timer.Context ctx = metrics.insertPostTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(insertPostWithIdSQL);
@@ -1140,7 +1071,7 @@ public class DB implements MetricSet {
    public void clearPostMeta(final long postId) throws SQLException {
       Connection conn = null;
       PreparedStatement stmt = null;
-      Timer.Context ctx = clearPostMetaTimer.time();
+      Timer.Context ctx = metrics.clearPostMetaTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(deletePostMetaSQL);
@@ -1166,7 +1097,7 @@ public class DB implements MetricSet {
       PreparedStatement stmt = null;
       ResultSet rs = null;
       List<Meta> meta = Lists.newArrayListWithExpectedSize(8);
-      Timer.Context ctx = selectPostMetaTimer.time();
+      Timer.Context ctx = metrics.selectPostMetaTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectPostMetaSQL);
@@ -1203,7 +1134,7 @@ public class DB implements MetricSet {
       }
       Connection conn = null;
       PreparedStatement stmt = null;
-      Timer.Context ctx = setPostMetaTimer.time();
+      Timer.Context ctx = metrics.setPostMetaTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(insertPostMetaSQL);
@@ -1261,7 +1192,7 @@ public class DB implements MetricSet {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-      Timer.Context ctx = createTermTimer.time();
+      Timer.Context ctx = metrics.createTermTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(insertTermSQL, Statement.RETURN_GENERATED_KEYS);
@@ -1292,7 +1223,7 @@ public class DB implements MetricSet {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-      Timer.Context ctx = selectTermTimer.time();
+      Timer.Context ctx = metrics.selectTermTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectTermIdSQL);
@@ -1322,7 +1253,7 @@ public class DB implements MetricSet {
       long taxonomyTermId = 0L;
       long termId = 0L;
       String description = "";
-      Timer.Context ctx = selectTaxonomyTermTimer.time();
+      Timer.Context ctx = metrics.selectTaxonomyTermTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectTaxonomyTermSQL);
@@ -1361,7 +1292,7 @@ public class DB implements MetricSet {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-      Timer.Context ctx = createTaxonomyTermTimer.time();
+      Timer.Context ctx = metrics.createTaxonomyTermTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(insertTaxonomyTermSQL, Statement.RETURN_GENERATED_KEYS);
@@ -1397,10 +1328,10 @@ public class DB implements MetricSet {
       TaxonomyTerm term;
       Cache<String, TaxonomyTerm> taxonomyTermCache = taxonomyTermCaches.get(taxonomy);
       if(taxonomyTermCache != null) {
-         taxonomyTermCacheTries.mark();
+         metrics.taxonomyTermCacheTries.mark();
          term = taxonomyTermCache.getIfPresent(name);
          if(term != null) {
-            taxonomyTermCacheHits.mark();
+            metrics.taxonomyTermCacheHits.mark();
             return term;
          }
       }
@@ -1429,10 +1360,10 @@ public class DB implements MetricSet {
     */
    public TaxonomyTerm resolveTaxonomyTerm(final long id) throws SQLException {
 
-      taxonomyTermCacheTries.mark();
+      metrics.taxonomyTermCacheTries.mark();
       TaxonomyTerm term = taxonomyTermCache.getIfPresent(id);
       if(term != null) {
-         taxonomyTermCacheHits.mark();
+         metrics.taxonomyTermCacheHits.mark();
          return term;
       }
 
@@ -1442,7 +1373,7 @@ public class DB implements MetricSet {
       long termId = 0;
       String taxonomy = "";
       String description = "";
-      Timer.Context ctx = taxonomyTermResolveTimer.time();
+      Timer.Context ctx = metrics.taxonomyTermResolveTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectTaxonomyTermIdSQL);
@@ -1478,7 +1409,7 @@ public class DB implements MetricSet {
    public void clearPostTerm(final long postId, final long taxonomyTermId) throws SQLException {
       Connection conn = null;
       PreparedStatement stmt = null;
-      Timer.Context ctx = postTermsClearTimer.time();
+      Timer.Context ctx = metrics.postTermsClearTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(clearPostTermSQL);
@@ -1501,7 +1432,7 @@ public class DB implements MetricSet {
    public void clearPostTerms(final long postId) throws SQLException {
       Connection conn = null;
       PreparedStatement stmt = null;
-      Timer.Context ctx = postTermsClearTimer.time();
+      Timer.Context ctx = metrics.postTermsClearTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(clearPostTermsSQL);
@@ -1552,7 +1483,7 @@ public class DB implements MetricSet {
 
       Connection conn = null;
       PreparedStatement stmt = null;
-      Timer.Context ctx = postTermsSetTimer.time();
+      Timer.Context ctx = metrics.postTermsSetTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(insertPostTermSQL);
@@ -1596,7 +1527,7 @@ public class DB implements MetricSet {
       PreparedStatement stmt = null;
       ResultSet rs = null;
       List<Long> termIds = Lists.newArrayListWithExpectedSize(8);
-      Timer.Context ctx = postTermsSelectTimer.time();
+      Timer.Context ctx = metrics.postTermsSelectTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectPostTermsSQL);
@@ -1648,7 +1579,7 @@ public class DB implements MetricSet {
       Connection conn = null;
       PreparedStatement stmt = null;
       ResultSet rs = null;
-      Timer.Context ctx = optionSelectTimer.time();
+      Timer.Context ctx = metrics.optionSelectTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectOptionSQL);
@@ -1727,7 +1658,7 @@ public class DB implements MetricSet {
       PreparedStatement stmt = null;
       ResultSet rs = null;
       List<Blog> blogs = Lists.newArrayListWithExpectedSize(4);
-      Timer.Context ctx = selectBlogsTimer.time();
+      Timer.Context ctx = metrics.selectBlogsTimer.time();
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectPublicBlogsSQL);
@@ -1743,83 +1674,9 @@ public class DB implements MetricSet {
       return blogs;
    }
 
-
-   private final Timer optionSelectTimer;
-   private final Timer postTermsSelectTimer;
-   private final Timer postTermsSetTimer;
-   private final Timer postTermsClearTimer;
-   private final Timer taxonomyTermResolveTimer;
-   private final Timer selectTaxonomyTermTimer;
-   private final Timer createTaxonomyTermTimer;
-   private final Timer createUserTimer;
-   private final Timer selectUserTimer;
-   private final Timer userMetadataTimer;
-   private final Timer deletePostTimer;
-   private final Timer selectAuthorPostsTimer;
-   private final Timer selectPostsTimer;
-   private final Timer selectModPostsTimer;
-   private final Timer selectPostIdsTimer;
-   private final Timer selectChildrenTimer;
-   private final Timer deleteChildrenTimer;
-   private final Timer selectSlugPostsTimer;
-   private final Timer selectPostTimer;
-   private final Timer insertPostTimer;
-   private final Timer updatePostTimer;
-   private final Timer clearPostMetaTimer;
-   private final Timer selectPostMetaTimer;
-   private final Timer setPostMetaTimer;
-   private final Timer createTermTimer;
-   private final Timer selectTermTimer;
-   private final Timer resolvePostTimer;
-   private final Timer selectBlogsTimer;
-
-   private final Meter userCacheHits;
-   private final Meter userCacheTries;
-
-   private final Meter usernameCacheHits;
-   private final Meter usernameCacheTries;
-
-   private final Meter taxonomyTermCacheHits;
-   private final Meter taxonomyTermCacheTries;
-
    @Override
    public Map<String, Metric> getMetrics() {
-      return ImmutableMap.<String, Metric>builder()
-              .put("select-option", optionSelectTimer)
-              .put("select-post-terms", postTermsSelectTimer)
-              .put("set-post-terms", postTermsSetTimer)
-              .put("clear-post-terms", postTermsClearTimer)
-              .put("resolve-taxonomy-term", taxonomyTermResolveTimer)
-              .put("select-taxonomy-term", selectTaxonomyTermTimer)
-              .put("create-taxonomy-term", createTaxonomyTermTimer)
-              .put("create-user", createUserTimer)
-              .put("select-user", selectUserTimer)
-              .put("select-user-metadata", userMetadataTimer)
-              .put("delete-post", deletePostTimer)
-              .put("select-author-posts", selectAuthorPostsTimer)
-              .put("select-posts", selectPostsTimer)
-              .put("select-mod-posts", selectModPostsTimer)
-              .put("select-post-ids", selectPostIdsTimer)
-              .put("select-post-children", selectChildrenTimer)
-              .put("delete-post_children", deleteChildrenTimer)
-              .put("select-slug-post", selectSlugPostsTimer)
-              .put("select-post", selectPostTimer)
-              .put("insert-post", insertPostTimer)
-              .put("update-post", updatePostTimer)
-              .put("resolve-post", resolvePostTimer)
-              .put("select-blogs", selectBlogsTimer)
-              .put("set-post-meta", setPostMetaTimer)
-              .put("clear-post-meta", clearPostMetaTimer)
-              .put("select-post-meta", selectPostMetaTimer)
-              .put("create-term", createTermTimer)
-              .put("select-term", selectTermTimer)
-              .put("try-user-cache", userCacheTries)
-              .put("hit-user-cache", userCacheHits)
-              .put("try-username-cache", usernameCacheTries)
-              .put("hit-username-cache", usernameCacheHits)
-              .put("try-taxonomy-term-cache", taxonomyTermCacheTries)
-              .put("hit-taxonomy-term-cache", taxonomyTermCacheHits)
-              .build();
+      return metrics.getMetrics();
    }
 
    /**
@@ -1834,4 +1691,5 @@ public class DB implements MetricSet {
    private final Cache<String, User> usernameCache;
    private final ImmutableMap<String, Cache<String, TaxonomyTerm>> taxonomyTermCaches;
    private final Cache<Long, TaxonomyTerm> taxonomyTermCache;
+   private final Metrics metrics;
 }

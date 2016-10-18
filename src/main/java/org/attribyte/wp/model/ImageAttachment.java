@@ -37,8 +37,9 @@ public class ImageAttachment extends Post {
     * @param slug The image slug.
     * @param mimeType The associated mime type.
     */
-   public ImageAttachment(final Post parent, final String path, final String slug, final String mimeType) {
-      this(parent, 0L, path, slug, mimeType);
+   public ImageAttachment(final Post parent, final String path, final String slug,
+                          final String caption, final String mimeType) {
+      this(parent, 0L, path, slug, caption, mimeType);
    }
 
    /**
@@ -47,10 +48,13 @@ public class ImageAttachment extends Post {
     * @param id The id.
     * @param path The image path.
     * @param slug The image slug.
+    * @param caption The image caption.
     * @param mimeType The associated mime type.
     */
-   public ImageAttachment(final Post parent, final long id, final String path, final String slug, final String mimeType) {
-      super(id, slug, slug, "", "", parent.authorId, parent.author, parent.publishTimestamp, parent.publishTimestamp,
+   public ImageAttachment(final Post parent, final long id, final String path,
+                          final String slug, final String caption,
+                          final String mimeType) {
+      super(id, slug, slug, caption, "", parent.authorId, parent.author, parent.publishTimestamp, parent.publishTimestamp,
               Status.INHERIT, parent.id, path, 0, ImmutableList.of(), Type.ATTACHMENT, mimeType,
               ImmutableMap.of(), ImmutableList.of());
    }

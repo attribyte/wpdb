@@ -13,6 +13,12 @@ import java.util.Map;
  */
 public class Shortcode {
 
+   public static void main(String[] args) throws Exception {
+      String shortcode = "[test z = 14 \"posit ional\"]";
+      System.out.println(Shortcode.parse(shortcode).toString());
+
+   }
+
    /**
     * Creates a shortcode without content.
     * @param name The name.
@@ -181,7 +187,9 @@ public class Shortcode {
          StringBuilder buf = new StringBuilder();
          AttrState state = AttrState.NAME;
          String currName = "";
+         int currPosition = 0;
          for(char ch : attrString.toCharArray()) {
+            //System.out.println(String.format("'%c', '%s'", ch, state.toString()));
             switch(state) {
                case NAME:
                   switch(ch) {
@@ -190,9 +198,31 @@ public class Shortcode {
                         buf.setLength(0);
                         state = AttrState.VALUE;
                         break;
+                     case ' ':
+                        state = AttrState.POSITIONAL_VALUE;
+                        break;
                      default:
                         if(isNameCharacter(ch)) {
                            buf.append(ch);
+                        }
+                        break;
+                  }
+                  break;
+               case POSITIONAL_VALUE:
+                  switch(ch) {
+                     case '=':
+                        currName = buf.toString().toLowerCase();
+                        buf.setLength(0);
+                        state = AttrState.VALUE;
+                        break;
+                     default:
+                        if(isNameCharacter(ch)) {
+                           if(buf.length() > 0) {
+                              attributes.put(String.format("$%d", currPosition++), buf.toString());
+                              buf.setLength(0);
+                           }
+                           buf.append(ch);
+                           state = AttrState.NAME;
                         }
                         break;
                   }
@@ -204,9 +234,11 @@ public class Shortcode {
                         state = AttrState.QUOTED_VALUE;
                         break;
                      case ' ':
-                        attributes.put(currName, buf.toString());
-                        buf.setLength(0);
-                        state = AttrState.NAME;
+                        if(buf.length() > 0) {
+                           attributes.put(currName, buf.toString());
+                           buf.setLength(0);
+                           state = AttrState.NAME;
+                        }
                         break;
                      case '[':
                      case ']':
@@ -235,11 +267,13 @@ public class Shortcode {
             }
          }
 
+         //System.out.println("final state is " + state.toString());
+
          switch(state) {
             case NAME:
                currName = buf.toString().trim();
                if(!currName.isEmpty()) {
-                  throw new ParseException(String.format("Expecting attribute value for '%s'", currName), 0);
+                  attributes.put(String.format("$%d", currPosition), buf.toString());
                }
                break;
             case VALUE:
@@ -259,6 +293,11 @@ public class Shortcode {
           * Parsing a name.
           */
          NAME,
+
+         /**
+          * Scanning for a "positional" value.
+          */
+         POSITIONAL_VALUE,
 
          /**
           * Parsing a quoted attribute value.

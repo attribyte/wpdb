@@ -58,6 +58,15 @@ public class Shortcode {
     */
    public final String content;
 
+   /**
+    * Gets a positional attribute value.
+    * @param pos The position.
+    * @return The value, or {@code null} if no value at the position.
+    */
+   public final String positionalValue(final int pos) {
+      return attributes.get(String.format("$%d", pos));
+   }
+
    @Override
    public final String toString() {
       StringBuilder buf = new StringBuilder("[");

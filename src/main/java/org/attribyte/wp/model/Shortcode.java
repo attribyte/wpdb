@@ -2,7 +2,6 @@ package org.attribyte.wp.model;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
 
 import java.text.ParseException;
 import java.util.Map;
@@ -14,9 +13,8 @@ import java.util.Map;
 public class Shortcode {
 
    public static void main(String[] args) throws Exception {
-      String shortcode = "[test z = 14 \"posit ional\"]";
+      String shortcode = "[test abc =def]";
       System.out.println(Shortcode.parse(shortcode).toString());
-
    }
 
    /**
@@ -70,7 +68,16 @@ public class Shortcode {
       StringBuilder buf = new StringBuilder("[");
       buf.append(name);
       attributes.entrySet().forEach(kv -> {
-         buf.append(" ").append(kv.getKey()).append("=\"").append(escapeAttribute(kv.getValue())).append("\"");
+         if(kv.getKey().startsWith("$")) {
+            buf.append(" ");
+            if(kv.getValue().contains(" ")) {
+               buf.append("\"").append(escapeAttribute(kv.getValue())).append("\"");
+            } else {
+               buf.append(kv.getValue());
+            }
+         } else {
+            buf.append(" ").append(kv.getKey()).append("=\"").append(escapeAttribute(kv.getValue())).append("\"");
+         }
       });
       buf.append("]");
       if(content != null) {
@@ -177,112 +184,145 @@ public class Shortcode {
       }
 
       /**
+       * Holds state for parsing attributes.
+       */
+      private static class AttributeString {
+
+         AttributeString(final String str) {
+            this.chars = str.toCharArray();
+            this.buf = new StringBuilder();
+         }
+
+         /**
+          * The current state.
+          */
+         enum StringState {
+
+            /**
+             * Before any recognized start character.
+             */
+            BEFORE_START,
+
+            /**
+             * Inside a quoted value.
+             */
+            QUOTED_VALUE,
+
+            /**
+             * A value.
+             */
+            VALUE,
+         }
+
+         private String value() {
+            String val = buf.toString();
+            buf.setLength(0);
+            return val;
+         }
+
+         String nextString() throws ParseException {
+
+            StringState state = StringState.BEFORE_START;
+
+            while(pos < chars.length) {
+               ch = chars[pos++];
+               switch(ch) {
+                  case '=':
+                     switch(state) {
+                        case BEFORE_START:
+                           buf.append(ch);
+                           state = StringState.VALUE;
+                           break;
+                        case QUOTED_VALUE:
+                           buf.append(ch);
+                           break;
+                        case VALUE:
+                           return value();
+                     }
+                     break;
+                  case ' ':
+                     switch(state) {
+                        case BEFORE_START:
+                           break;
+                        case QUOTED_VALUE:
+                           buf.append(ch);
+                           break;
+                        case VALUE:
+                           return value();
+                     }
+                     break;
+                  case '\"':
+                  case '\'':
+                     switch(state) {
+                        case BEFORE_START:
+                           state = StringState.QUOTED_VALUE;
+                           break;
+                        case QUOTED_VALUE:
+                           return value();
+                        case VALUE:
+                           throw new ParseException("Unexpected '\"'", pos);
+                     }
+                     break;
+                  default:
+                     switch(state) {
+                        case BEFORE_START:
+                           state = StringState.VALUE;
+                           break;
+                     }
+                     buf.append(ch);
+                     break;
+               }
+            }
+
+            switch(state) {
+               case VALUE:
+                  return buf.toString();
+               case QUOTED_VALUE:
+                  throw new ParseException("Expected '\"' or '\''", pos);
+               default:
+                  return null;
+            }
+         }
+
+         char ch;
+         int pos = 0;
+         String last;
+
+         final char[] chars;
+         final StringBuilder buf;
+      }
+
+      /**
        * Parse attributes in a shortcode.
        * @param attrString The attribute string.
        * @return The map of attributes. Keys are <em>lower-case</em>.
        * @throws ParseException on invalid shortcode.
        */
       private static Map<String, String> parseAttributes(String attrString) throws ParseException {
-         Map<String, String> attributes = Maps.newHashMapWithExpectedSize(4);
-         StringBuilder buf = new StringBuilder();
+
+         AttributeString str = new AttributeString(attrString);
+         ImmutableMap.Builder<String, String> attributes = ImmutableMap.builder(); //Immutable map preserves entry order.
          AttrState state = AttrState.NAME;
          String currName = "";
-         int currPosition = 0;
-         for(char ch : attrString.toCharArray()) {
-            //System.out.println(String.format("'%c', '%s'", ch, state.toString()));
+         String currString = "";
+         int currPos = 0;
+         while((currString = str.nextString()) != null) {
             switch(state) {
                case NAME:
-                  switch(ch) {
-                     case '=':
-                        currName = buf.toString().toLowerCase();
-                        buf.setLength(0);
-                        state = AttrState.VALUE;
-                        break;
-                     case ' ':
-                        state = AttrState.POSITIONAL_VALUE;
-                        break;
-                     default:
-                        if(isNameCharacter(ch)) {
-                           buf.append(ch);
-                        }
-                        break;
-                  }
-                  break;
-               case POSITIONAL_VALUE:
-                  switch(ch) {
-                     case '=':
-                        currName = buf.toString().toLowerCase();
-                        buf.setLength(0);
-                        state = AttrState.VALUE;
-                        break;
-                     default:
-                        if(isNameCharacter(ch)) {
-                           if(buf.length() > 0) {
-                              attributes.put(String.format("$%d", currPosition++), buf.toString());
-                              buf.setLength(0);
-                           }
-                           buf.append(ch);
-                           state = AttrState.NAME;
-                        }
-                        break;
+                  if(str.ch == '=') {
+                     currName = currString;
+                     state = AttrState.VALUE;
+                  } else {
+                     attributes.put(String.format("$%d", currPos++), currString);
                   }
                   break;
                case VALUE:
-                  switch(ch) {
-                     case '\"':
-                     case '\'':
-                        state = AttrState.QUOTED_VALUE;
-                        break;
-                     case ' ':
-                        if(buf.length() > 0) {
-                           attributes.put(currName, buf.toString());
-                           buf.setLength(0);
-                           state = AttrState.NAME;
-                        }
-                        break;
-                     case '[':
-                     case ']':
-                        throw new ParseException(String.format("Invalid character ('%c')", ch), 0);
-                     default:
-                        buf.append(ch);
-                        break;
-                  }
-                  break;
-               case QUOTED_VALUE:
-                  switch(ch) {
-                     case '\"':
-                     case '\'':
-                        attributes.put(currName, buf.toString());
-                        buf.setLength(0);
-                        state = AttrState.NAME;
-                        break;
-                     case '[':
-                     case ']':
-                        throw new ParseException(String.format("Invalid character ('%c')", ch), 0);
-                     default:
-                        buf.append(ch);
-                        break;
-                  }
+                  attributes.put(currName.toLowerCase(), currString);
+                  state = AttrState.NAME;
                   break;
             }
          }
-
-         //System.out.println("final state is " + state.toString());
-
-         switch(state) {
-            case NAME:
-               currName = buf.toString().trim();
-               if(!currName.isEmpty()) {
-                  attributes.put(String.format("$%d", currPosition), buf.toString());
-               }
-               break;
-            case VALUE:
-               attributes.put(currName, buf.toString());
-               break;
-            case QUOTED_VALUE:
-               throw new ParseException("Expecting '\"' to end quoted value", 0);
-         }
-         return attributes;
+         return attributes.build();
       }
 
       /**
@@ -295,17 +335,7 @@ public class Shortcode {
          NAME,
 
          /**
-          * Scanning for a "positional" value.
-          */
-         POSITIONAL_VALUE,
-
-         /**
-          * Parsing a quoted attribute value.
-          */
-         QUOTED_VALUE,
-
-         /**
-          * Parsing an unquoted attribute value.
+          * Expecting a value.
           */
          VALUE;
       }

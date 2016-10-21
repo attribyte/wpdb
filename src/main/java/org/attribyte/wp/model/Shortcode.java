@@ -12,11 +12,6 @@ import java.util.Map;
  */
 public class Shortcode {
 
-   public static void main(String[] args) throws Exception {
-      String shortcode = "[test abc =def]";
-      System.out.println(Shortcode.parse(shortcode).toString());
-   }
-
    /**
     * Creates a shortcode without content.
     * @param name The name.
@@ -217,6 +212,20 @@ public class Shortcode {
          private String value() {
             String val = buf.toString();
             buf.setLength(0);
+            if(ch == ' ') { //Eat trailing spaces...
+               int currPos = pos;
+               while(currPos < chars.length) {
+                  char currChar = chars[currPos];
+                  if(currChar != ' ') {
+                     pos = currPos;
+                     ch = chars[pos];
+                     break;
+                  } else {
+                     currPos++;
+                  }
+               }
+            }
+
             return val;
          }
 
@@ -230,7 +239,6 @@ public class Shortcode {
                   case '=':
                      switch(state) {
                         case BEFORE_START:
-                           buf.append(ch);
                            state = StringState.VALUE;
                            break;
                         case QUOTED_VALUE:

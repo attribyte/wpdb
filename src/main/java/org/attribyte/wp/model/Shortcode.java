@@ -94,11 +94,7 @@ public class Shortcode {
                buf.append(kv.getValue());
             }
          } else {
-            if(kv.getValue().contains(" ")) {
-               buf.append(" ").append(kv.getKey()).append("=\"").append(escapeAttribute(kv.getValue())).append("\"");
-            } else {
-               buf.append(" ").append(kv.getKey()).append("=").append(escapeAttribute(kv.getValue()));
-            }
+            buf.append(" ").append(kv.getKey()).append("=\"").append(escapeAttribute(kv.getValue())).append("\"");
          }
       });
       buf.append("]");

@@ -4,7 +4,9 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 
 import java.text.ParseException;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * A shortcode.
@@ -67,6 +69,18 @@ public class Shortcode {
       return attributes.get(String.format("$%d", pos));
    }
 
+   /**
+    * Gets a list of any positional values.
+    * @return The list of values.
+    */
+   public final List<String> positionalValues() {
+      return attributes.entrySet()
+              .stream()
+              .filter(kv -> kv.getKey().startsWith("$"))
+              .map(Map.Entry::getValue)
+              .collect(Collectors.toList());
+   }
+
    @Override
    public final String toString() {
       StringBuilder buf = new StringBuilder("[");
@@ -80,7 +94,11 @@ public class Shortcode {
                buf.append(kv.getValue());
             }
          } else {
-            buf.append(" ").append(kv.getKey()).append("=\"").append(escapeAttribute(kv.getValue())).append("\"");
+            if(kv.getValue().contains(" ")) {
+               buf.append(" ").append(kv.getKey()).append("=\"").append(escapeAttribute(kv.getValue())).append("\"");
+            } else {
+               buf.append(" ").append(kv.getKey()).append("=").append(escapeAttribute(kv.getValue()));
+            }
          }
       });
       buf.append("]");

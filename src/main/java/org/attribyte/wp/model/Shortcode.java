@@ -122,13 +122,40 @@ public class Shortcode {
       return buf;
    }
 
+   /**
+    * A handler for shortcode parse events.
+    */
    public static interface Handler {
+      /**
+       * Parsed a shortcode.
+       * @param shortcode The shortcode.
+       */
       public void shortcode(Shortcode shortcode);
+
+      /**
+       * A block of text between shortcodes.
+       * @param text The text.
+       */
       public void text(String text);
+
+      /**
+       * A shortcode parse error.
+       * @param text The text that could not be parsed as a shortcode.
+       * @param pe A parse exception, or {@code null} if none.
+       */
       public void parseError(String text, ParseException pe);
+
+      /**
+       * Override to indicate shortcodes where content (and an end-tag) is expected.
+       * @param shortcode The shortcode name.
+       * @return Is this a shortcode where content is expected?
+       */
       public boolean expectContent(final String shortcode);
    }
 
+   /**
+    * State for parsing with a handler.
+    */
    private enum HandlerParseState {
       TEXT,
       START,
@@ -137,7 +164,11 @@ public class Shortcode {
       END_NAME;
    }
 
-
+   /**
+    * Parse an arbitrary string.
+    * @param str The string.
+    * @param handler The handler for parse events.
+    */
    public static void parse(final String str, final Handler handler) {
       if(str == null) {
          return;
@@ -287,7 +318,7 @@ public class Shortcode {
     * @param val The value.
     * @return The escaped value.
     */
-   public static String escapeAttribute(final String val) {
+   private static String escapeAttribute(final String val) {
       return Strings.nullToEmpty(val); //TODO?
    }
 

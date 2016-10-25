@@ -105,6 +105,130 @@ public class Shortcode {
       return buf.toString();
    }
 
+
+   public static interface Handler {
+      public void shortcode(Shortcode shortcode);
+      public void text(String text);
+      public void parseError(String text, ParseException pe);
+      public boolean expectContent(final String shortcode);
+   }
+
+   private enum HandlerParseState {
+      TEXT,
+      START,
+      CONTENT,
+      START_END,
+      END_NAME;
+   }
+
+
+   public static void parse(final String str, final Handler handler) {
+      if(str == null) {
+         return;
+      }
+
+      StringBuilder buf = new StringBuilder();
+      HandlerParseState state = HandlerParseState.TEXT;
+      Shortcode currCode = null;
+      String currContent = null;
+      for(char ch : str.toCharArray()) {
+         switch(state) {
+            case TEXT:
+               switch(ch) {
+                  case '[':
+                     if(buf.length() > 0) {
+                        handler.text(buf.toString());
+                        buf.setLength(0);
+                     }
+                     state = HandlerParseState.START;
+                     buf.append(ch);
+                     break;
+                  default:
+                     buf.append(ch);
+                     break;
+               }
+               break;
+            case START:
+               switch(ch) {
+                  case ']':
+                     try {
+                        buf.append(ch);
+                        currCode = Parser.parseStart(buf.toString());
+                        if(!handler.expectContent(currCode.name)) {
+                           handler.shortcode(currCode);
+                           currCode = null;
+                           state = HandlerParseState.TEXT;
+                        } else {
+                           state = HandlerParseState.CONTENT;
+                        }
+                     } catch(ParseException pe) {
+                        handler.parseError(buf.toString(), pe);
+                        state = HandlerParseState.TEXT;
+                     }
+                     buf.setLength(0);
+                     break;
+                  default:
+                     buf.append(ch);
+                     break;
+               }
+               break;
+            case CONTENT:
+               switch(ch) {
+                  case '[':
+                     currContent = buf.toString();
+                     buf.setLength(0);
+                     state = HandlerParseState.START_END;
+                     break;
+                  default:
+                     buf.append(ch);
+                     break;
+               }
+               break;
+            case START_END:
+               switch(ch) {
+                  case '/':
+                     state = HandlerParseState.END_NAME;
+                     break;
+                  default:
+                     buf.append('[').append(ch);
+                     handler.parseError(buf.toString(), null);
+                     buf.setLength(0);
+                     state = HandlerParseState.TEXT;
+                     break;
+               }
+               break;
+            case END_NAME:
+               switch(ch) {
+                  case ']':
+                     if(buf.toString().equals(currCode.name)) {
+                        handler.shortcode(currCode.withContent(currContent));
+                        buf.setLength(0);
+                        currCode = null;
+                        currContent = null;
+                     } else {
+                        handler.parseError(currCode.toString() + currContent + "[/" + buf.toString() + "]", new ParseException("Invalid end tag", 0));
+                        buf.setLength(0);
+                     }
+                     state = HandlerParseState.TEXT;
+                     break;
+                  default:
+                     buf.append(ch);
+               }
+         }
+      }
+
+      switch(state) {
+         case TEXT:
+            if(buf.length() > 0) {
+               handler.text(buf.toString());
+            }
+            break;
+         default:
+            handler.parseError(buf.toString(), null);
+            break;
+      }
+   }
+
    /**
     * Parses a shortcode
     * @param shortcode The shortcode string.

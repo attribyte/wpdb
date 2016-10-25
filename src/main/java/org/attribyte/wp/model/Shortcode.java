@@ -61,6 +61,15 @@ public class Shortcode {
    public final String content;
 
    /**
+    * Gets an attribute value.
+    * @param name The attribute name.
+    * @return The value or {@code null} if no value for this attribute.
+    */
+   public final String value(final String name) {
+      return attributes.get(name.toLowerCase());
+   }
+
+   /**
     * Gets a positional attribute value.
     * @param pos The position.
     * @return The value, or {@code null} if no value at the position.
@@ -88,13 +97,10 @@ public class Shortcode {
       attributes.entrySet().forEach(kv -> {
          if(kv.getKey().startsWith("$")) {
             buf.append(" ");
-            if(kv.getValue().contains(" ")) {
-               buf.append("\"").append(escapeAttribute(kv.getValue())).append("\"");
-            } else {
-               buf.append(kv.getValue());
-            }
+            appendAttributeValue(kv.getValue(), buf);
          } else {
-            buf.append(" ").append(kv.getKey()).append("=\"").append(escapeAttribute(kv.getValue())).append("\"");
+            buf.append(" ").append(kv.getKey()).append("=");
+            appendAttributeValue(kv.getValue(), buf);
          }
       });
       buf.append("]");
@@ -105,6 +111,16 @@ public class Shortcode {
       return buf.toString();
    }
 
+   private StringBuilder appendAttributeValue(final String value, final StringBuilder buf) {
+      if(value.contains("\"")) {
+         buf.append("\'").append(escapeAttribute(value)).append("\'");
+      } else if(value.contains(" ") || value.contains("\'") || value.contains("=")) {
+         buf.append("\"").append(escapeAttribute(value)).append("\"");
+      } else {
+         buf.append(escapeAttribute(value));
+      }
+      return buf;
+   }
 
    public static interface Handler {
       public void shortcode(Shortcode shortcode);
@@ -346,9 +362,14 @@ public class Shortcode {
             BEFORE_START,
 
             /**
-             * Inside a quoted value.
+             * Inside a single-quoted value.
              */
-            QUOTED_VALUE,
+            SINGLE_QUOTED_VALUE,
+
+            /**
+             * Inside a double-quoted value.
+             */
+            DOUBLE_QUOTED_VALUE,
 
             /**
              * A value.
@@ -388,7 +409,8 @@ public class Shortcode {
                         case BEFORE_START:
                            state = StringState.VALUE;
                            break;
-                        case QUOTED_VALUE:
+                        case SINGLE_QUOTED_VALUE:
+                        case DOUBLE_QUOTED_VALUE:
                            buf.append(ch);
                            break;
                         case VALUE:
@@ -399,7 +421,8 @@ public class Shortcode {
                      switch(state) {
                         case BEFORE_START:
                            break;
-                        case QUOTED_VALUE:
+                        case SINGLE_QUOTED_VALUE:
+                        case DOUBLE_QUOTED_VALUE:
                            buf.append(ch);
                            break;
                         case VALUE:
@@ -407,15 +430,31 @@ public class Shortcode {
                      }
                      break;
                   case '\"':
-                  case '\'':
                      switch(state) {
                         case BEFORE_START:
-                           state = StringState.QUOTED_VALUE;
+                           state = StringState.DOUBLE_QUOTED_VALUE;
                            break;
-                        case QUOTED_VALUE:
+                        case SINGLE_QUOTED_VALUE:
+                           buf.append(ch);
+                           break;
+                        case DOUBLE_QUOTED_VALUE:
                            return value();
                         case VALUE:
                            throw new ParseException("Unexpected '\"'", pos);
+                     }
+                     break;
+                  case '\'':
+                     switch(state) {
+                        case BEFORE_START:
+                           state = StringState.SINGLE_QUOTED_VALUE;
+                           break;
+                        case DOUBLE_QUOTED_VALUE:
+                           buf.append(ch);
+                           break;
+                        case SINGLE_QUOTED_VALUE:
+                           return value();
+                        case VALUE:
+                           throw new ParseException("Unexpected '\'", pos);
                      }
                      break;
                   default:
@@ -432,8 +471,10 @@ public class Shortcode {
             switch(state) {
                case VALUE:
                   return buf.toString();
-               case QUOTED_VALUE:
-                  throw new ParseException("Expected '\"' or '\''", pos);
+               case SINGLE_QUOTED_VALUE:
+                  throw new ParseException("Expected \'", pos);
+               case DOUBLE_QUOTED_VALUE:
+                  throw new ParseException("Expected \"", pos);
                default:
                   return null;
             }

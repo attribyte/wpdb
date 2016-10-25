@@ -19,12 +19,13 @@ import org.attribyte.wp.model.Shortcode;
 import org.junit.Test;
 
 import java.text.ParseException;
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.Assert.*;
 
 /**
- * Tests for shortcode parsing.
+ * Tests for shortcode parsing functions.
  */
 public class ShortcodeTest {
 
@@ -61,6 +62,69 @@ public class ShortcodeTest {
       String lastErrorText;
       ParseException lastParseException;
       ImmutableSet<String> expectContent;
+   }
+
+   @Test
+   public void lowercased() throws Exception {
+      String text = "[testcode TestVal=\"test'test\"]";
+      Shortcode code = Shortcode.parse(text);
+      assertNotNull(code.attributes.get("testval"));
+      assertEquals("test\'test", code.attributes.get("testval"));
+   }
+
+   @Test
+   public void doubleSingleQuote() throws Exception {
+      String text = "[testcode testval=\"test'test\"]";
+      Shortcode code = Shortcode.parse(text);
+      assertEquals(text, code.toString());
+   }
+
+   @Test
+   public void singleDoubleQuote() throws Exception {
+      String text = "[testcode testval=\'test\"test\']";
+      Shortcode code = Shortcode.parse(text);
+      assertEquals(text, code.toString());
+   }
+
+   @Test
+   public void noSpecial() throws Exception {
+      String text = "[testcode testval=test2]";
+      Shortcode code = Shortcode.parse(text);
+      assertEquals(text, code.toString());
+   }
+
+   @Test
+   public void positionalValue() throws Exception {
+      String text = "[testcode testval]";
+      Shortcode code = Shortcode.parse(text);
+      assertEquals(text, code.toString());
+      assertNotNull(code.positionalValue(0));
+      assertEquals("testval", code.positionalValue(0));
+   }
+
+   @Test
+   public void noValue() throws Exception {
+      String text = "[testcode]";
+      Shortcode code = Shortcode.parse(text);
+      assertEquals(text, code.toString());
+   }
+
+   @Test
+   public void positionalValues() throws Exception {
+      String text = "[testcode testval x=y z=1 testval2]";
+      Shortcode code = Shortcode.parse(text);
+      List<String> values = code.positionalValues();
+      assertNotNull(values);
+      assertEquals(2, values.size());
+      assertEquals("testval", values.get(0));
+      assertEquals("testval2", values.get(1));
+   }
+
+   @Test
+   public void positionalValueWithSpecial() throws Exception {
+      String text = "[testcode \"test val\"]";
+      Shortcode code = Shortcode.parse(text);
+      assertEquals(text, code.toString());
    }
 
    @Test
@@ -128,7 +192,7 @@ public class ShortcodeTest {
 
    @Test
    public void handlMulti() throws Exception {
-      String text = "[testcode testval] [testcode2 a=\"b\"] end";
+      String text = "[testcode testval] [testcode2 a=b] end";
       BufferHandler handler = new BufferHandler();
       Shortcode.parse(text, handler);
       assertNull(handler.lastErrorText);
@@ -137,7 +201,7 @@ public class ShortcodeTest {
 
    @Test
    public void handleMixedMulti() throws Exception {
-      String text = "some text [testcode testval] some more text [testcode2 a=\"b\"] end";
+      String text = "some text [testcode testval] some more text [testcode2 a=b] end";
       BufferHandler handler = new BufferHandler();
       Shortcode.parse(text, handler);
       assertNull(handler.lastErrorText);

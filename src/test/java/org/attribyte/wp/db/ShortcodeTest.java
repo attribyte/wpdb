@@ -14,13 +14,14 @@
 
 package org.attribyte.wp.db;
 
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableMap;
 import org.attribyte.wp.model.Shortcode;
+import org.attribyte.wp.model.ShortcodeParser;
 import org.junit.Test;
 
 import java.text.ParseException;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 import static org.junit.Assert.*;
 
@@ -29,18 +30,14 @@ import static org.junit.Assert.*;
  */
 public class ShortcodeTest {
 
-   static class BufferHandler implements Shortcode.Handler {
+   static class BufferHandler implements ShortcodeParser.Handler {
 
-      BufferHandler(final Set<String> expectContent) {
-         this.expectContent = ImmutableSet.copyOf(expectContent);
+      BufferHandler(final Map<String, Shortcode.Type> expectContent) {
+         this.shortcodeTypes = ImmutableMap.copyOf(expectContent);
       }
-
-      BufferHandler() {
-         this.expectContent = ImmutableSet.of();
-      }
-
 
       public void shortcode(Shortcode shortcode) {
+         this.lastShortcode = shortcode;
          buf.append(shortcode.toString());
       }
 
@@ -54,14 +51,16 @@ public class ShortcodeTest {
          lastParseException = pe;
       }
 
-      public boolean expectContent(final String shortcode) {
-         return expectContent.contains(shortcode);
+      public Shortcode.Type type(final String shortcode) {
+         Shortcode.Type type = shortcodeTypes.get(shortcode);
+         return type != null ? type : Shortcode.Type.UNKNOWN;
       }
 
       StringBuilder buf = new StringBuilder();
       String lastErrorText;
+      Shortcode lastShortcode = null;
       ParseException lastParseException;
-      ImmutableSet<String> expectContent;
+      ImmutableMap<String, Shortcode.Type> shortcodeTypes;
    }
 
    @Test
@@ -130,8 +129,19 @@ public class ShortcodeTest {
    @Test
    public void handleSimpleShortcode() throws Exception {
       String text = "[testcode testval]";
-      BufferHandler handler = new BufferHandler();
+      BufferHandler handler = new BufferHandler(ImmutableMap.of("testcode", Shortcode.Type.SELF_CLOSING));
       Shortcode.parse(text, handler);
+      assertNotNull(handler.lastShortcode);
+      assertNull(handler.lastErrorText);
+      assertEquals(text, handler.buf.toString());
+   }
+
+   @Test
+   public void unknownTag() throws Exception {
+      String text = "[testcodex testval]";
+      BufferHandler handler = new BufferHandler(ImmutableMap.of("testcode", Shortcode.Type.SELF_CLOSING));
+      Shortcode.parse(text, handler);
+      assertNull(handler.lastShortcode);
       assertNull(handler.lastErrorText);
       assertEquals(text, handler.buf.toString());
    }
@@ -139,8 +149,9 @@ public class ShortcodeTest {
    @Test
    public void handleInvalidStart() throws Exception {
       String text = "[testcode some text a=\"b\"";
-      BufferHandler handler = new BufferHandler();
+      BufferHandler handler = new BufferHandler(ImmutableMap.of("testcode", Shortcode.Type.SELF_CLOSING));
       Shortcode.parse(text, handler);
+      assertNull(handler.lastShortcode);
       assertNotNull(handler.lastErrorText);
       assertEquals(text, handler.buf.toString());
    }
@@ -148,7 +159,7 @@ public class ShortcodeTest {
    @Test
    public void textOnly() throws Exception {
       String text = "this is some text ] ";
-      BufferHandler handler = new BufferHandler();
+      BufferHandler handler = new BufferHandler(ImmutableMap.of());
       Shortcode.parse(text, handler);
       assertNull(handler.lastErrorText);
       assertEquals(text, handler.buf.toString());
@@ -157,8 +168,9 @@ public class ShortcodeTest {
    @Test
    public void handleExpectedContent() throws Exception {
       String text = "[testcode testval]the text[/testcode]";
-      BufferHandler handler = new BufferHandler(ImmutableSet.of("testcode"));
+      BufferHandler handler = new BufferHandler(ImmutableMap.of("testcode", Shortcode.Type.ENCLOSING));
       Shortcode.parse(text, handler);
+      assertNotNull(handler.lastShortcode);
       assertNull(handler.lastErrorText);
       assertEquals(text, handler.buf.toString());
    }
@@ -166,8 +178,9 @@ public class ShortcodeTest {
    @Test
    public void handleMismatchEnd() throws Exception {
       String text = "[testcode testval]the text[/testcodex]";
-      BufferHandler handler = new BufferHandler(ImmutableSet.of("testcode"));
+      BufferHandler handler = new BufferHandler(ImmutableMap.of("testcode", Shortcode.Type.ENCLOSING));
       Shortcode.parse(text, handler);
+      assertNull(handler.lastShortcode);
       assertNotNull(handler.lastErrorText);
       assertEquals(text, handler.buf.toString());
    }
@@ -175,17 +188,18 @@ public class ShortcodeTest {
    @Test
    public void handleInvalidEnd() throws Exception {
       String text = "[/testcode testval]the text[/testcodex]";
-      BufferHandler handler = new BufferHandler(ImmutableSet.of("testcode"));
+      BufferHandler handler = new BufferHandler(ImmutableMap.of("testcode", Shortcode.Type.SELF_CLOSING));
       Shortcode.parse(text, handler);
-      assertNotNull(handler.lastErrorText);
+      assertNull(handler.lastShortcode);
       assertEquals(text, handler.buf.toString());
    }
 
    @Test
    public void handleMixed() throws Exception {
       String text = "some text [testcode testval] some more text";
-      BufferHandler handler = new BufferHandler();
+      BufferHandler handler = new BufferHandler(ImmutableMap.of("testcode", Shortcode.Type.SELF_CLOSING));
       Shortcode.parse(text, handler);
+      assertNotNull(handler.lastShortcode);
       assertNull(handler.lastErrorText);
       assertEquals(text, handler.buf.toString());
    }
@@ -193,17 +207,25 @@ public class ShortcodeTest {
    @Test
    public void handlMulti() throws Exception {
       String text = "[testcode testval] [testcode2 a=b] end";
-      BufferHandler handler = new BufferHandler();
+      BufferHandler handler = new BufferHandler(ImmutableMap.of(
+              "testcode", Shortcode.Type.SELF_CLOSING,
+              "testcode2", Shortcode.Type.SELF_CLOSING));
       Shortcode.parse(text, handler);
       assertNull(handler.lastErrorText);
+      assertNotNull(handler.lastShortcode);
+      assertEquals("testcode2", handler.lastShortcode.name);
       assertEquals(text, handler.buf.toString());
    }
 
    @Test
    public void handleMixedMulti() throws Exception {
       String text = "some text [testcode testval] some more text [testcode2 a=b] end";
-      BufferHandler handler = new BufferHandler();
+      BufferHandler handler = new BufferHandler(ImmutableMap.of(
+              "testcode", Shortcode.Type.SELF_CLOSING,
+              "testcode2", Shortcode.Type.SELF_CLOSING));
       Shortcode.parse(text, handler);
+      assertNotNull(handler.lastShortcode);
+      assertEquals("testcode2", handler.lastShortcode.name);
       assertNull(handler.lastErrorText);
       assertEquals(text, handler.buf.toString());
    }

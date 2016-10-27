@@ -15,6 +15,27 @@ import java.util.stream.Collectors;
 public class Shortcode {
 
    /**
+    * The type (enclosing or self-closing).
+    */
+   public enum Type {
+
+      /**
+       * Self-closing (@code{[example]}).
+       */
+      SELF_CLOSING,
+
+      /**
+       * Enclosing (@code{[example]content[/example]}).
+       */
+      ENCLOSING,
+
+      /**
+       * Unknown or invalid type.
+       */
+      UNKNOWN;
+   }
+
+   /**
     * Creates a shortcode without content.
     * @param name The name.
     * @param attributes The attributes.
@@ -111,6 +132,12 @@ public class Shortcode {
       return buf.toString();
    }
 
+   /**
+    * Appends an attribute value with appropriate quoting.
+    * @param value The value.
+    * @param buf The buffer to append to.
+    * @return The input buffer.
+    */
    private StringBuilder appendAttributeValue(final String value, final StringBuilder buf) {
       if(value.contains("\"")) {
          buf.append("\'").append(escapeAttribute(value)).append("\'");
@@ -120,160 +147,6 @@ public class Shortcode {
          buf.append(escapeAttribute(value));
       }
       return buf;
-   }
-
-   /**
-    * A handler for shortcode parse events.
-    */
-   public static interface Handler {
-      /**
-       * Parsed a shortcode.
-       * @param shortcode The shortcode.
-       */
-      public void shortcode(Shortcode shortcode);
-
-      /**
-       * A block of text between shortcodes.
-       * @param text The text.
-       */
-      public void text(String text);
-
-      /**
-       * A shortcode parse error.
-       * @param text The text that could not be parsed as a shortcode.
-       * @param pe A parse exception, or {@code null} if none.
-       */
-      public void parseError(String text, ParseException pe);
-
-      /**
-       * Override to indicate shortcodes where content (and an end-tag) is expected.
-       * @param shortcode The shortcode name.
-       * @return Is this a shortcode where content is expected?
-       */
-      public boolean expectContent(final String shortcode);
-   }
-
-   /**
-    * State for parsing with a handler.
-    */
-   private enum HandlerParseState {
-      TEXT,
-      START,
-      CONTENT,
-      START_END,
-      END_NAME;
-   }
-
-   /**
-    * Parse an arbitrary string.
-    * @param str The string.
-    * @param handler The handler for parse events.
-    */
-   public static void parse(final String str, final Handler handler) {
-      if(str == null) {
-         return;
-      }
-
-      StringBuilder buf = new StringBuilder();
-      HandlerParseState state = HandlerParseState.TEXT;
-      Shortcode currCode = null;
-      String currContent = null;
-      for(char ch : str.toCharArray()) {
-         switch(state) {
-            case TEXT:
-               switch(ch) {
-                  case '[':
-                     if(buf.length() > 0) {
-                        handler.text(buf.toString());
-                        buf.setLength(0);
-                     }
-                     state = HandlerParseState.START;
-                     buf.append(ch);
-                     break;
-                  default:
-                     buf.append(ch);
-                     break;
-               }
-               break;
-            case START:
-               switch(ch) {
-                  case ']':
-                     try {
-                        buf.append(ch);
-                        currCode = Parser.parseStart(buf.toString());
-                        if(!handler.expectContent(currCode.name)) {
-                           handler.shortcode(currCode);
-                           currCode = null;
-                           state = HandlerParseState.TEXT;
-                        } else {
-                           state = HandlerParseState.CONTENT;
-                        }
-                     } catch(ParseException pe) {
-                        handler.parseError(buf.toString(), pe);
-                        state = HandlerParseState.TEXT;
-                     }
-                     buf.setLength(0);
-                     break;
-                  default:
-                     buf.append(ch);
-                     break;
-               }
-               break;
-            case CONTENT:
-               switch(ch) {
-                  case '[':
-                     currContent = buf.toString();
-                     buf.setLength(0);
-                     state = HandlerParseState.START_END;
-                     break;
-                  default:
-                     buf.append(ch);
-                     break;
-               }
-               break;
-            case START_END:
-               switch(ch) {
-                  case '/':
-                     state = HandlerParseState.END_NAME;
-                     break;
-                  default:
-                     buf.append('[').append(ch);
-                     handler.parseError(buf.toString(), null);
-                     buf.setLength(0);
-                     state = HandlerParseState.TEXT;
-                     break;
-               }
-               break;
-            case END_NAME:
-               switch(ch) {
-                  case ']':
-                     if(buf.toString().equals(currCode.name)) {
-                        handler.shortcode(currCode.withContent(currContent));
-                        buf.setLength(0);
-                        currCode = null;
-                        currContent = null;
-                     } else {
-                        handler.parseError(currCode.toString() + currContent + "[/" + buf.toString() + "]", new ParseException("Invalid end tag", 0));
-                        buf.setLength(0);
-                     }
-                     state = HandlerParseState.TEXT;
-                     break;
-                  default:
-                     buf.append(ch);
-               }
-         }
-      }
-
-      switch(state) {
-         case TEXT:
-            if(buf.length() > 0) {
-               handler.text(buf.toString());
-            }
-            break;
-         default:
-            handler.parseError(buf.toString(), null);
-            break;
-      }
    }
 
    /**
@@ -298,7 +171,7 @@ public class Shortcode {
          throw new ParseException("Expecting ']", 0);
       }
 
-      Shortcode startTag = Parser.parseStart(exp.substring(0, end + 1));
+      Shortcode startTag = ShortcodeParser.parseStart(exp.substring(0, end + 1));
 
       end = exp.lastIndexOf("[/");
       if(end > 0) {
@@ -314,257 +187,20 @@ public class Shortcode {
    }
 
    /**
+    * Parse an arbitrary string.
+    * @param str The string.
+    * @param handler The handler for parse events.
+    */
+   public static void parse(final String str, final ShortcodeParser.Handler handler) {
+      ShortcodeParser.parse(str, handler);
+   }
+
+   /**
     * Escapes an attribute value.
     * @param val The value.
     * @return The escaped value.
     */
    private static String escapeAttribute(final String val) {
       return Strings.nullToEmpty(val); //TODO?
-   }
-
-   private static class Parser {
-
-      private static boolean isNameCharacter(final char ch) {
-         return (Character.isLetterOrDigit(ch) || ch == '_' || ch == '-');
-      }
-
-      private static String validateName(final String str) throws ParseException {
-         for(char ch : str.toCharArray()) {
-            if(!isNameCharacter(ch)) {
-               throw new ParseException(String.format("Invalid name ('%s')", str), 0);
-            }
-         }
-         return str;
-      }
-
-      /**
-       * Parse '[shortcode attr0="val0" attr1="val1"]
-       * @param str The shortcode string.
-       * @return The shortcode.
-       * @throws ParseException on invalid shortcode.
-       */
-      private static Shortcode parseStart(final String str) throws ParseException {
-         String exp = str.trim();
-
-         if(exp.length() < 3) {
-            throw new ParseException(String.format("Invalid shortcode ('%s')", str), 0);
-         }
-
-         if(exp.charAt(0) != '[') {
-            throw new ParseException("Expecting '['", 0);
-         }
-
-         if(exp.charAt(exp.length() -1) != ']') {
-            throw new ParseException("Expecting ']'", exp.length() - 1);
-         }
-
-         exp = exp.substring(1, exp.length() -1).trim();
-
-         if(exp.length() == 0) {
-            throw new ParseException(String.format("Invalid shortcode ('%s')", str), 0);
-         }
-
-         int attrStart = exp.indexOf(' ');
-         if(attrStart < 0) {
-            return new Shortcode(validateName(exp), ImmutableMap.of());
-         } else {
-            return new Shortcode(validateName(exp.substring(0, attrStart)), parseAttributes(exp.substring(attrStart).trim()));
-         }
-      }
-
-      /**
-       * Holds state for parsing attributes.
-       */
-      private static class AttributeString {
-
-         AttributeString(final String str) {
-            this.chars = str.toCharArray();
-            this.buf = new StringBuilder();
-         }
-
-         /**
-          * The current state.
-          */
-         enum StringState {
-
-            /**
-             * Before any recognized start character.
-             */
-            BEFORE_START,
-
-            /**
-             * Inside a single-quoted value.
-             */
-            SINGLE_QUOTED_VALUE,
-
-            /**
-             * Inside a double-quoted value.
-             */
-            DOUBLE_QUOTED_VALUE,
-
-            /**
-             * A value.
-             */
-            VALUE,
-         }
-
-         private String value() {
-            String val = buf.toString();
-            buf.setLength(0);
-            if(ch == ' ') { //Eat trailing spaces...
-               int currPos = pos;
-               while(currPos < chars.length) {
-                  char currChar = chars[currPos];
-                  if(currChar != ' ') {
-                     pos = currPos;
-                     ch = chars[pos];
-                     break;
-                  } else {
-                     currPos++;
-                  }
-               }
-            }
-
-            return val;
-         }
-
-         String nextString() throws ParseException {
-
-            StringState state = StringState.BEFORE_START;
-
-            while(pos < chars.length) {
-               ch = chars[pos++];
-               switch(ch) {
-                  case '=':
-                     switch(state) {
-                        case BEFORE_START:
-                           state = StringState.VALUE;
-                           break;
-                        case SINGLE_QUOTED_VALUE:
-                        case DOUBLE_QUOTED_VALUE:
-                           buf.append(ch);
-                           break;
-                        case VALUE:
-                           return value();
-                     }
-                     break;
-                  case ' ':
-                     switch(state) {
-                        case BEFORE_START:
-                           break;
-                        case SINGLE_QUOTED_VALUE:
-                        case DOUBLE_QUOTED_VALUE:
-                           buf.append(ch);
-                           break;
-                        case VALUE:
-                           return value();
-                     }
-                     break;
-                  case '\"':
-                     switch(state) {
-                        case BEFORE_START:
-                           state = StringState.DOUBLE_QUOTED_VALUE;
-                           break;
-                        case SINGLE_QUOTED_VALUE:
-                           buf.append(ch);
-                           break;
-                        case DOUBLE_QUOTED_VALUE:
-                           return value();
-                        case VALUE:
-                           throw new ParseException("Unexpected '\"'", pos);
-                     }
-                     break;
-                  case '\'':
-                     switch(state) {
-                        case BEFORE_START:
-                           state = StringState.SINGLE_QUOTED_VALUE;
-                           break;
-                        case DOUBLE_QUOTED_VALUE:
-                           buf.append(ch);
-                           break;
-                        case SINGLE_QUOTED_VALUE:
-                           return value();
-                        case VALUE:
-                           throw new ParseException("Unexpected '\'", pos);
-                     }
-                     break;
-                  default:
-                     switch(state) {
-                        case BEFORE_START:
-                           state = StringState.VALUE;
-                           break;
-                     }
-                     buf.append(ch);
-                     break;
-               }
-            }
-
-            switch(state) {
-               case VALUE:
-                  return buf.toString();
-               case SINGLE_QUOTED_VALUE:
-                  throw new ParseException("Expected \'", pos);
-               case DOUBLE_QUOTED_VALUE:
-                  throw new ParseException("Expected \"", pos);
-               default:
-                  return null;
-            }
-         }
-
-         char ch;
-         int pos = 0;
-         String last;
-
-         final char[] chars;
-         final StringBuilder buf;
-      }
-
-      /**
-       * Parse attributes in a shortcode.
-       * @param attrString The attribute string.
-       * @return The map of attributes. Keys are <em>lower-case</em>.
-       * @throws ParseException on invalid shortcode.
-       */
-      private static Map<String, String> parseAttributes(String attrString) throws ParseException {
-
-         AttributeString str = new AttributeString(attrString);
-         ImmutableMap.Builder<String, String> attributes = ImmutableMap.builder(); //Immutable map preserves entry order.
-         AttrState state = AttrState.NAME;
-         String currName = "";
-         String currString = "";
-         int currPos = 0;
-         while((currString = str.nextString()) != null) {
-            switch(state) {
-               case NAME:
-                  if(str.ch == '=') {
-                     currName = currString;
-                     state = AttrState.VALUE;
-                  } else {
-                     attributes.put(String.format("$%d", currPos++), currString);
-                  }
-                  break;
-               case VALUE:
-                  attributes.put(currName.toLowerCase(), currString);
-                  state = AttrState.NAME;
-                  break;
-            }
-         }
-         return attributes.build();
-      }
-
-      /**
-       * Attribute parse state.
-       */
-      private enum AttrState {
-         /**
-          * Parsing a name.
-          */
-         NAME,
-
-         /**
-          * Expecting a value.
-          */
-         VALUE;
-      }
    }
 }

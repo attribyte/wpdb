@@ -339,7 +339,7 @@ public class ShortcodeParser {
       return "";
    }
 
-   public static void parse(final String str, final Handler handler) {
+   static void parse(final String str, final Handler handler) {
       if(str == null) {
          return;
       }
@@ -353,7 +353,6 @@ public class ShortcodeParser {
 
       while(pos < chars.length) {
          char ch = chars[pos++];
-         //System.out.println("" + ch + "="+state);
          switch(state) {
             case TEXT:
                switch(ch) {
@@ -382,12 +381,11 @@ public class ShortcodeParser {
                      try {
                         handler.shortcode(ShortcodeParser.parseStart(buf.toString()));
                         buf.setLength(0);
-                        state = HandlerParseState.TEXT;
                      } catch(ParseException pe) {
                         pe.printStackTrace();
                         handler.parseError(buf.toString(), pe);
-                        state = HandlerParseState.TEXT;
                      }
+                     state = HandlerParseState.TEXT;
                      break;
                   default:
                      buf.append(ch);
@@ -470,5 +468,4 @@ public class ShortcodeParser {
             break;
       }
    }
-
 }

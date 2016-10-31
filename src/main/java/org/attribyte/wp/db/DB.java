@@ -74,6 +74,16 @@ public class DB implements MetricSet {
    }
 
    /**
+    * Creates a database for another site with shared user caches, metrics and taxonomy terms.
+    * @param siteId The site id.
+    * @return The site-specific database.
+    */
+   public DB forSite(final long siteId) {
+      return new DB(this.connectionSupplier, siteId, this.taxonomyTermCaches.keySet(), this.taxonomyCacheTimeout,
+              this.userCache, this.usernameCache, this.metrics);
+   }
+
+   /**
     * Creates a database.
     * @param connectionSupplier Supplies connections to the underlying database.
     * @param siteId The site id.
@@ -88,6 +98,35 @@ public class DB implements MetricSet {
              final Duration taxonomyCacheTimeout,
              final Duration userCacheTimeout,
              final MetricSource metricSource) {
+      this(connectionSupplier, siteId, cachedTaxonomies, taxonomyCacheTimeout,
+              CacheBuilder.newBuilder()
+                      .concurrencyLevel(4)
+                      .expireAfterWrite(userCacheTimeout.toMillis(), TimeUnit.MILLISECONDS)
+                      .build(),
+              CacheBuilder.newBuilder()
+                      .concurrencyLevel(4)
+                      .expireAfterWrite(userCacheTimeout.toMillis(), TimeUnit.MILLISECONDS)
+                      .build(),
+              new Metrics(metricSource));
+   }
+
+   /**
+    * Creates a database.
+    * @param connectionSupplier Supplies connections to the underlying database.
+    * @param siteId The site id.
+    * @param cachedTaxonomies Enable caches for these taxonomies.
+    * @param taxonomyCacheTimeout The expiration for taxonomy caches. If {@code 0}, caching is disabled.
+    * @param userCache A cache of user vs id.
+    * @param usernameCache A cache of user vs username.
+    * @param metrics The metrics.
+    */
+   public DB(final ConnectionSupplier connectionSupplier,
+             final long siteId,
+             final Set<String> cachedTaxonomies,
+             final Duration taxonomyCacheTimeout,
+             final Cache<Long, User> userCache,
+             final Cache<String, User> usernameCache,
+             final Metrics metrics) {
       this.connectionSupplier = connectionSupplier;
       this.siteId = siteId;
 
@@ -112,16 +151,10 @@ public class DB implements MetricSet {
          termTaxonomyTableName = "wp_" + siteId + "_term_taxonomy";
       }
 
-      this.userCache = CacheBuilder.newBuilder()
-              .concurrencyLevel(4)
-              .expireAfterWrite(userCacheTimeout.toMillis(), TimeUnit.MILLISECONDS)
-              .build();
+      this.userCache = userCache;
+      this.usernameCache = usernameCache;
 
-      this.usernameCache = CacheBuilder.newBuilder()
-              .concurrencyLevel(4)
-              .expireAfterWrite(userCacheTimeout.toMillis(), TimeUnit.MILLISECONDS)
-              .build();
-
+      this.taxonomyCacheTimeout = taxonomyCacheTimeout;
       ImmutableMap.Builder<String, Cache<String, TaxonomyTerm>> taxonomyTermCachesBuilder = ImmutableMap.builder();
       for(String taxonomy : cachedTaxonomies) {
          taxonomyTermCachesBuilder.put(taxonomy,
@@ -201,7 +234,7 @@ public class DB implements MetricSet {
       this.selectModPostsWithTypeSQL = selectPostSQL + postsTableName +
               " WHERE post_type=? AND (post_modified > ? OR (post_modified=? AND ID > ?)) ORDER BY post_modified ASC, ID ASC LIMIT ?";
 
-      this.metrics = new Metrics(metricSource);
+      this.metrics = metrics;
    }
 
    private static final String createUserSQL =
@@ -1690,6 +1723,7 @@ public class DB implements MetricSet {
    private final Cache<Long, User> userCache;
    private final Cache<String, User> usernameCache;
    private final ImmutableMap<String, Cache<String, TaxonomyTerm>> taxonomyTermCaches;
+   private final Duration taxonomyCacheTimeout;
    private final Cache<Long, TaxonomyTerm> taxonomyTermCache;
    private final Metrics metrics;
 }

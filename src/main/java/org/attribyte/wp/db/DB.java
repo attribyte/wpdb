@@ -79,7 +79,7 @@ public class DB implements MetricSet {
     * @return The site-specific database.
     */
    public DB forSite(final long siteId) {
-      return new DB(this.connectionSupplier, siteId, this.taxonomyTermCaches.keySet(), this.taxonomyCacheTimeout,
+      return siteId == this.siteId ? this : new DB(this.connectionSupplier, siteId, this.taxonomyTermCaches.keySet(), this.taxonomyCacheTimeout,
               this.userCache, this.usernameCache, this.metrics);
    }
 

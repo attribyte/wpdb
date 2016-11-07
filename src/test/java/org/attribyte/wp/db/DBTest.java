@@ -33,6 +33,7 @@ import org.junit.Test;
 import java.time.Duration;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
@@ -199,6 +200,28 @@ public class DBTest {
       List<Long> posts = db().selectPostIds(EnumSet.of(Post.Type.POST, Post.Type.ATTACHMENT), Post.Status.PUBLISH, ImmutableList.of(),Post.Sort.DESC, new Paging(0, 2));
       assertNotNull(posts);
       assertTrue(posts.size() > 0);
+   }
+
+   @Test
+   public void mapSelect() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      Post testPost0 = createTestPost(createdUser, -1);
+      db().insertPost(testPost0, TimeZone.getDefault());
+      Post testPost1 = createTestPost(createdUser, -1);
+      db().insertPost(testPost1, TimeZone.getDefault());
+      Map<Long, Post> postMap = db().selectPostMap(ImmutableList.of(testPost1.id, testPost0.id), true);
+      assertNotNull(postMap);
+      assertEquals(2, postMap.size());
+      assertTrue(postMap.containsKey(testPost0.id));
+      assertTrue(postMap.containsKey(testPost1.id));
+
+      List<Post> posts = db().selectPosts(ImmutableList.of(testPost1.id, testPost0.id), true);
+      assertNotNull(posts);
+      assertEquals(2, posts.size());
+      assertEquals(testPost1.id, posts.get(0).id);
+      assertEquals(testPost0.id, posts.get(1).id);
    }
 
    @Test

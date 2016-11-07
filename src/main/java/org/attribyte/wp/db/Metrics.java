@@ -51,6 +51,7 @@ public class Metrics implements MetricSet {
       this.deleteChildrenTimer = metricSource.newTimer();
       this.selectSlugPostsTimer = metricSource.newTimer();
       this.selectPostTimer = metricSource.newTimer();
+      this.selectPostMapTimer = metricSource.newTimer();
       this.insertPostTimer = metricSource.newTimer();
       this.updatePostTimer = metricSource.newTimer();
       this.clearPostMetaTimer = metricSource.newTimer();
@@ -90,6 +91,7 @@ public class Metrics implements MetricSet {
               .put("delete-post_children", deleteChildrenTimer)
               .put("select-slug-post", selectSlugPostsTimer)
               .put("select-post", selectPostTimer)
+              .put("select-post-map", selectPostMapTimer)
               .put("insert-post", insertPostTimer)
               .put("update-post", updatePostTimer)
               .put("resolve-post", resolvePostTimer)
@@ -127,6 +129,7 @@ public class Metrics implements MetricSet {
    Timer deleteChildrenTimer;
    Timer selectSlugPostsTimer;
    Timer selectPostTimer;
+   Timer selectPostMapTimer;
    Timer insertPostTimer;
    Timer updatePostTimer;
    Timer clearPostMetaTimer;

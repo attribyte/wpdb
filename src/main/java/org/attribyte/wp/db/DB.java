@@ -25,6 +25,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.attribyte.sql.ConnectionSupplier;
 import org.attribyte.util.SQLUtil;
@@ -45,6 +46,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
@@ -1045,6 +1047,62 @@ public class DB implements MetricSet {
          ctx.stop();
          SQLUtil.closeQuietly(conn, stmt, rs);
       }
+   }
+
+
+   /**
+    * Selects posts from a collection of ids into a map.
+    * @param postIds The collection of ids.
+    * @param withResolve Should associated users, etc be resolved?
+    * @return A map of post vs id.
+    * @throws SQLException on database error.
+    */
+   public Map<Long, Post> selectPostMap(final Collection<Long> postIds, final boolean withResolve) throws SQLException {
+
+      Map<Long, Post> postMap = Maps.newHashMapWithExpectedSize(postIds.size());
+
+      Connection conn = null;
+      Statement stmt = null;
+      ResultSet rs = null;
+      Timer.Context ctx = metrics.selectPostMapTimer.time();
+      StringBuilder sql = new StringBuilder(selectPostSQL).append(postsTableName).append(" WHERE ID IN (");
+      sql.append(inJoiner.join(postIds));
+      sql.append(")");
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.createStatement();
+         rs = stmt.executeQuery(sql.toString());
+         while(rs.next()) {
+            Post.Builder post = postFromResultSet(rs);
+            postMap.put(post.getId(), withResolve ? resolve(post).build() : post.build());
+         }
+         return postMap;
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+   }
+
+   /**
+    * Selects posts from a collection of ids into a list in input order.
+    * @param postIds The collection of post ids.
+    * @param withResolve Should associated users, etc be resolved?
+    * @return The list of posts.
+    * @throws SQLException on database error.
+    */
+   public List<Post> selectPosts(final Collection<Long> postIds, final boolean withResolve) throws SQLException {
+      if(postIds == null || postIds.size() == 0) {
+         return ImmutableList.of();
+      }
+      Map<Long, Post> postMap = selectPostMap(postIds, withResolve);
+      List<Post> posts = Lists.newArrayListWithExpectedSize(postMap.size());
+      for(long id : postIds) {
+         Post post = postMap.get(id);
+         if(post != null) {
+            posts.add(post);
+         }
+      }
+      return posts;
    }
 
    private final String updatePostSQL;

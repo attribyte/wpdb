@@ -18,6 +18,7 @@ package org.attribyte.wp.db;
 import com.codahale.metrics.Metric;
 import com.codahale.metrics.MetricSet;
 import com.codahale.metrics.Timer;
+import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -44,12 +45,14 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static org.attribyte.util.SQLUtil.closeQuietly;
 import static org.attribyte.wp.Util.CATEGORY_TAXONOMY;
@@ -144,6 +147,9 @@ public class DB implements MetricSet {
          termTaxonomyTableName = "wp_term_taxonomy";
       } else {
          this.postsTableName = "wp_" + siteId + "_posts";
+
+         System.out.println("posts table name is " + this.postsTableName);
+
          postMetaTableName = "wp_" + siteId + "_postmeta";
          optionsTableName = "wp_" + siteId + "_options";
          termsTableName = "wp_" + siteId + "_terms";
@@ -232,7 +238,7 @@ public class DB implements MetricSet {
               " WHERE post_modified > ? OR (post_modified=? AND ID > ?) ORDER BY post_modified ASC, ID ASC LIMIT ?";
 
       this.selectModPostsWithTypeSQL = selectPostSQL + postsTableName +
-              " WHERE post_type=? AND (post_modified > ? OR (post_modified=? AND ID > ?)) ORDER BY post_modified ASC, ID ASC LIMIT ?";
+              " WHERE (post_modified > ? OR (post_modified=? AND ID > ?)) %s ORDER BY post_modified ASC, ID ASC LIMIT ?";
 
       this.metrics = metrics;
    }
@@ -562,6 +568,26 @@ public class DB implements MetricSet {
                                          final long startId,
                                          final int limit,
                                          final boolean withResolve) throws SQLException {
+      return selectModifiedPosts(type != null ? EnumSet.of(type) : null,
+              startTimestamp, startId, limit, withResolve);
+   }
+
+
+   /**
+    * Selects recently modified posts, in ascending order after a specified timestamp and id.
+    * @param types The set of post type. May be {@code null} or empty for all types.
+    * @param startTimestamp The timestamp after which posts were modified.
+    * @param startId The start id. Posts that have timestamp that match {@code startTimestamp} exactly must if ids greater.
+    * @param limit The maximum number of posts returned.
+    * @return The list of posts.
+    * @param withResolve Should associated users, etc be resolved?
+    * @throws SQLException on database error.
+    */
+   public List<Post> selectModifiedPosts(final EnumSet<Post.Type> types,
+                                         final long startTimestamp,
+                                         final long startId,
+                                         final int limit,
+                                         final boolean withResolve) throws SQLException {
 
       List<Post.Builder> builders = Lists.newArrayListWithExpectedSize(limit < 1024 ? limit : 1024);
       Connection conn = null;
@@ -572,20 +598,16 @@ public class DB implements MetricSet {
          conn = connectionSupplier.getConnection();
          Timestamp ts = new Timestamp(startTimestamp);
 
-         if(type == null) {
+         if(types == null || types.size() == 0) {
             stmt = conn.prepareStatement(selectModPostsSQL);
-            stmt.setTimestamp(1, ts);
-            stmt.setTimestamp(2, ts);
-            stmt.setLong(3, startId);
-            stmt.setInt(4, limit);
          } else {
-            stmt = conn.prepareStatement(selectModPostsWithTypeSQL);
-            stmt.setString(1, type.toString().toLowerCase());
-            stmt.setTimestamp(2, ts);
-            stmt.setTimestamp(3, ts);
-            stmt.setLong(4, startId);
-            stmt.setInt(5, limit);
+            stmt = conn.prepareStatement(String.format(selectModPostsWithTypeSQL, appendPostTypes(types, new StringBuilder()).toString()));
          }
+
+         stmt.setTimestamp(1, ts);
+         stmt.setTimestamp(2, ts);
+         stmt.setLong(3, startId);
+         stmt.setInt(4, limit);
 
          rs = stmt.executeQuery();
          while(rs.next()) {
@@ -609,8 +631,8 @@ public class DB implements MetricSet {
    }
 
    /**
-    * Selects a page of posts with a specified type.
-    * @param type The post type.
+    * Selects a page of posts with a specific type.
+    * @param type The post type. May be {@code null} for any type.
     * @param status The required post status.
     * @param sort The page sort.
     * @param paging The page range and interval.
@@ -619,6 +641,24 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public List<Post> selectPosts(final Post.Type type,
+                                 final Post.Status status,
+                                 final Post.Sort sort,
+                                 final Paging paging,
+                                 final boolean withResolve) throws SQLException {
+      return selectPosts(type != null ? EnumSet.of(type) : null, status, sort, paging, withResolve);
+   }
+
+   /**
+    * Selects a page of posts with a set of specified types.
+    * @param types The set of post types to be included. If {@code null} or empty, all types will be included.
+    * @param status The required post status.
+    * @param sort The page sort.
+    * @param paging The page range and interval.
+    * @param withResolve Should associated users, etc be resolved?
+    * @return The list of posts.
+    * @throws SQLException on database error.
+    */
+   public List<Post> selectPosts(final EnumSet<Post.Type> types,
                                  final Post.Status status,
                                  final Post.Sort sort,
                                  final Paging paging,
@@ -632,7 +672,8 @@ public class DB implements MetricSet {
 
       StringBuilder sql = new StringBuilder(selectPostSQL);
       sql.append(postsTableName);
-      sql.append(" WHERE post_type=? AND post_status=?");
+      sql.append(" WHERE post_status=?");
+      appendPostTypes(types, sql);
       appendPagingSortSQL(sql, sort, paging);
 
       Connection conn = null;
@@ -642,16 +683,15 @@ public class DB implements MetricSet {
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(sql.toString());
-         stmt.setString(1, type.toString().toLowerCase());
-         stmt.setString(2, status.toString().toLowerCase());
+         stmt.setString(1, status.toString().toLowerCase());
          if(paging.interval != null) {
-            stmt.setTimestamp(3, new Timestamp(paging.interval.getStartMillis()));
-            stmt.setTimestamp(4, new Timestamp(paging.interval.getEndMillis()));
-            stmt.setInt(5, paging.start);
-            stmt.setInt(6, paging.limit);
+            stmt.setTimestamp(2, new Timestamp(paging.interval.getStartMillis()));
+            stmt.setTimestamp(3, new Timestamp(paging.interval.getEndMillis()));
+            stmt.setInt(4, paging.start);
+            stmt.setInt(5, paging.limit);
          } else {
-            stmt.setInt(3, paging.start);
-            stmt.setInt(4, paging.limit);
+            stmt.setInt(2, paging.start);
+            stmt.setInt(3, paging.limit);
          }
          rs = stmt.executeQuery();
          while(rs.next()) {
@@ -676,7 +716,7 @@ public class DB implements MetricSet {
 
    /**
     * Selects a page of posts with a specified type.
-    * @param type The post type.
+    * @param type The post type. May be {@code null} for any type.
     * @param status The required post status.
     * @param terms A collection of terms attached to the posts.
     * @param sort The page sort.
@@ -685,6 +725,24 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public List<Long> selectPostIds(final Post.Type type,
+                                   final Post.Status status,
+                                   final Collection<TaxonomyTerm> terms,
+                                   final Post.Sort sort,
+                                   final Paging paging) throws SQLException {
+      return selectPostIds(type != null ? EnumSet.of(type) : null, status, terms, sort, paging);
+   }
+
+   /**
+    * Selects a page of posts with associated terms and a set of types.
+    * @param types The post types. May be {@code null} or empty fo any type.
+    * @param status The required post status.
+    * @param terms A collection of terms attached to the posts.
+    * @param sort The page sort.
+    * @param paging The page range and interval.
+    * @return The list of posts.
+    * @throws SQLException on database error.
+    */
+   public List<Long> selectPostIds(final EnumSet<Post.Type> types,
                                    final Post.Status status,
                                    final Collection<TaxonomyTerm> terms,
                                    final Post.Sort sort,
@@ -700,7 +758,7 @@ public class DB implements MetricSet {
       sql.append(postsTableName);
       if(terms != null && terms.size() > 0) {
          sql.append(",").append(termRelationshipsTableName);
-         sql.append(" WHERE post_type=? AND post_status=? AND object_id=ID AND ");
+         sql.append(" WHERE post_status=? AND object_id=ID AND ");
          if(terms.size() == 1) {
             sql.append("term_taxonomy_id=").append(terms.iterator().next().id);
          } else {
@@ -713,8 +771,10 @@ public class DB implements MetricSet {
             sql.append(")");
          }
       } else {
-         sql.append(" WHERE post_type=? AND post_status=?");
+         sql.append(" WHERE post_status=?");
       }
+
+      appendPostTypes(types, sql);
       appendPagingSortSQL(sql, sort, paging);
 
       Connection conn = null;
@@ -724,16 +784,15 @@ public class DB implements MetricSet {
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(sql.toString());
-         stmt.setString(1, type.toString().toLowerCase());
-         stmt.setString(2, status.toString().toLowerCase());
+         stmt.setString(1, status.toString().toLowerCase());
          if(paging.interval != null) {
-            stmt.setTimestamp(3, new Timestamp(paging.interval.getStartMillis()));
-            stmt.setTimestamp(4, new Timestamp(paging.interval.getEndMillis()));
-            stmt.setInt(5, paging.start);
-            stmt.setInt(6, paging.limit);
+            stmt.setTimestamp(2, new Timestamp(paging.interval.getStartMillis()));
+            stmt.setTimestamp(3, new Timestamp(paging.interval.getEndMillis()));
+            stmt.setInt(4, paging.start);
+            stmt.setInt(5, paging.limit);
          } else {
-            stmt.setInt(3, paging.start);
-            stmt.setInt(4, paging.limit);
+            stmt.setInt(2, paging.start);
+            stmt.setInt(3, paging.limit);
          }
          rs = stmt.executeQuery();
          while(rs.next()) {
@@ -811,12 +870,37 @@ public class DB implements MetricSet {
    }
 
    /**
+    * Appends post type constraint.
+    * @param types The types.
+    * @param sql The buffer to append to.
+    * @return The input buffer.
+    */
+   private StringBuilder appendPostTypes(final EnumSet<Post.Type> types, final StringBuilder sql) {
+      int typesCount = types != null ? types.size() : 0;
+      switch(typesCount) {
+         case 0:
+            break;
+         case 1:
+            sql.append(" AND post_type=").append(String.format("'%s'", types.iterator().next().toString()));
+            break;
+         default:
+            sql.append(" AND post_type IN (");
+            sql.append(inJoiner.join(types.stream().map(t -> String.format("'%s'", t.toString())).collect(Collectors.toSet())));
+            sql.append(")");
+            break;
+      }
+
+      return sql;
+   }
+
+   /**
     * Appends paging interval constraint, if required, paging and sort.
     * @param sql The buffer to append to.
     * @param sort The sort.
     * @param paging The paging.
+    * @return The input buffer.
     */
-   private void appendPagingSortSQL(final StringBuilder sql, final Post.Sort sort,final Paging paging) {
+   private StringBuilder appendPagingSortSQL(final StringBuilder sql, final Post.Sort sort,final Paging paging) {
 
       if(paging.interval != null) {
          sql.append(" AND post_date");
@@ -852,6 +936,7 @@ public class DB implements MetricSet {
             break;
       }
       sql.append(" LIMIT ?,?");
+      return sql;
    }
 
    private final String selectPostsBySlugSQL;
@@ -1726,4 +1811,5 @@ public class DB implements MetricSet {
    private final Duration taxonomyCacheTimeout;
    private final Cache<Long, TaxonomyTerm> taxonomyTermCache;
    private final Metrics metrics;
+   private static final Joiner inJoiner = Joiner.on(',').skipNulls();
 }

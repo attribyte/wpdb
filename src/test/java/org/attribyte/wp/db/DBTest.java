@@ -31,6 +31,7 @@ import org.joda.time.Interval;
 import org.junit.Test;
 
 import java.time.Duration;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Random;
@@ -188,6 +189,19 @@ public class DBTest {
    }
 
    @Test
+   public void idSelectMultiTypeWithTerms() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      Post testPost0 = createTestPost(createdUser, -1);
+      db().insertPost(testPost0, TimeZone.getDefault());
+      db().setPostTerms(testPost0.id, "test_taxonomy", ImmutableList.of("test0", "test1"));
+      List<Long> posts = db().selectPostIds(EnumSet.of(Post.Type.POST, Post.Type.ATTACHMENT), Post.Status.PUBLISH, ImmutableList.of(),Post.Sort.DESC, new Paging(0, 2));
+      assertNotNull(posts);
+      assertTrue(posts.size() > 0);
+   }
+
+   @Test
    public void resolvePost() throws Exception {
       String username = StringUtil.randomString(8);
       User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
@@ -258,6 +272,21 @@ public class DBTest {
    }
 
    @Test
+   public void postMultiType() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      Post testPost0 = createTestPost(createdUser, -1);
+      Post testPost1 = createTestPost(createdUser, -1);
+      db().insertPost(testPost0, TimeZone.getDefault());
+      db().insertPost(testPost1, TimeZone.getDefault());
+
+      List<Post> posts = db().selectPosts(EnumSet.of(Post.Type.POST, Post.Type.ATTACHMENT), Post.Status.PUBLISH, Post.Sort.DESC, new Paging(0, 2), true);
+      assertNotNull(posts);
+      assertEquals(2, posts.size());
+   }
+
+   @Test
    public void modPosts() throws Exception {
       String username = StringUtil.randomString(8);
       User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
@@ -268,11 +297,11 @@ public class DBTest {
       Post testPost1 = createTestPost(createdUser, 1001L);
       db().insertPost(testPost0, TimeZone.getDefault());
       db().insertPost(testPost1, TimeZone.getDefault());
-      List<Post> posts = db().selectModifiedPosts(null, 0L, 0L, 2, false);
+      List<Post> posts = db().selectModifiedPosts((Post.Type)null, 0L, 0L, 2, false);
       assertNotNull(posts);
       assertEquals(2, posts.size());
 
-      posts = db().selectModifiedPosts(null, System.currentTimeMillis() + 3600L * 24L * 1000L, testPost1.id, 2, false);
+      posts = db().selectModifiedPosts((Post.Type)null, System.currentTimeMillis() + 3600L * 24L * 1000L, testPost1.id, 2, false);
       assertEquals(0, posts.size());
    }
 
@@ -288,6 +317,22 @@ public class DBTest {
       db().insertPost(testPost0, TimeZone.getDefault());
       db().insertPost(testPost1, TimeZone.getDefault());
       List<Post> posts = db().selectModifiedPosts(Post.Type.POST, 0L, 0L, 2, false);
+      assertNotNull(posts);
+      assertEquals(2, posts.size());
+   }
+
+   @Test
+   public void modPostsMultiType() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      db().deletePost(1000L);
+      db().deletePost(1001L);
+      Post testPost0 = createTestPost(createdUser, 1000L);
+      Post testPost1 = createTestPost(createdUser, 1001L);
+      db().insertPost(testPost0, TimeZone.getDefault());
+      db().insertPost(testPost1, TimeZone.getDefault());
+      List<Post> posts = db().selectModifiedPosts(EnumSet.of(Post.Type.POST, Post.Type.ATTACHMENT), 0L, 0L, 2, false);
       assertNotNull(posts);
       assertEquals(2, posts.size());
    }

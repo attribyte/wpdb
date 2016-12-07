@@ -93,6 +93,31 @@ public class DBTest {
    }
 
    @Test
+   public void userMetadata() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      assertNotNull(createdUser);
+      assertTrue(createdUser.id > 0L);
+      db().updateUserMeta(createdUser.id, "test-key", "test-value-0");
+      List<Meta> meta = db().userMetadata(createdUser.id, "test-key");
+      assertNotNull(meta);
+      assertEquals(1, meta.size());
+      assertEquals("test-value-0", meta.get(0).value);
+
+      db().updateUserMeta(createdUser.id, "test-key", "test-value-1");
+      meta = db().userMetadata(createdUser.id, "test-key");
+      assertNotNull(meta);
+      assertEquals(1, meta.size());
+      assertEquals("test-value-1", meta.get(0).value);
+
+      db().clearUserMeta(createdUser.id);
+      meta = db().userMetadata(createdUser.id);
+      assertNotNull(meta);
+      assertEquals(0, meta.size());
+   }
+
+   @Test
    public void insertPost() throws Exception {
       String username = StringUtil.randomString(8);
       User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());

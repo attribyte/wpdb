@@ -31,7 +31,6 @@ Missing Features
 ----------------
 
 * Comments
-* User metadata
 
 Requirements
 ------------

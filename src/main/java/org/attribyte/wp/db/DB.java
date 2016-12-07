@@ -432,6 +432,108 @@ public class DB implements MetricSet {
       }
    }
 
+   private static final String selectUserMetaKeySQL = "SELECT umeta_id, meta_key, meta_value FROM wp_usermeta WHERE user_id=? AND meta_key=? ORDER BY umeta_id DESC";
+
+   /**
+    * Selects user metadata with a specified key.
+    * @param userId The user id.
+    * @param key The metadata key.
+    * @return The list of values.
+    * @throws SQLException on database error.
+    */
+   public List<Meta> userMetadata(final long userId, final String key) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+      List<Meta> meta = Lists.newArrayListWithExpectedSize(16);
+      Timer.Context ctx = metrics.userMetadataTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(selectUserMetaKeySQL);
+         stmt.setLong(1, userId);
+         stmt.setString(2, key);
+         rs = stmt.executeQuery();
+         while(rs.next()) {
+            meta.add(new Meta(rs.getLong(1), rs.getString(2), rs.getString(3)));
+         }
+         return meta;
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+   }
+
+   private static final String deleteUserMetaSQL = "DELETE FROM wp_usermeta WHERE user_id=?";
+
+   /**
+    * Clears all metadata for a user.
+    * @param userId The user id.
+    * @throws SQLException on database error.
+    */
+   public void clearUserMeta(final long userId) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      Timer.Context ctx = metrics.clearUserMetaTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(deleteUserMetaSQL);
+         stmt.setLong(1, userId);
+         stmt.executeUpdate();
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt);
+      }
+   }
+
+   private static final String firstUserMetaIdSQL = "SELECT umeta_id FROM wp_usermeta WHERE user_id=? AND meta_key=? ORDER BY umeta_id DESC LIMIT 1";
+   private static final String insertUserMetaSQL = "INSERT INTO wp_usermeta (user_id, meta_key, meta_value) VALUES (?,?,?)";
+   private static final String updateUserMetaSQL = "UPDATE wp_usermeta SET meta_value=? WHERE umeta_id=?";
+
+   /**
+    * Updates a user metadata value, replacing the value of the first existing match, or creating if none exists.
+    * <p>
+    *    Note that there is not a unique key, e.g. (user_id, meta_key), so users may have multiple metadata
+    *    with the same name.
+    * </p>
+    * @param userId The user id.
+    * @param key The metadata key.
+    * @param value The metadata value.
+    * @throws SQLException on database error.
+    */
+   public void updateUserMeta(final long userId, final String key, final String value) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(firstUserMetaIdSQL);
+         stmt.setLong(1, userId);
+         stmt.setString(2, key);
+         rs = stmt.executeQuery();
+         if(rs.next()) {
+            long umetaId = rs.getLong(1);
+            stmt = conn.prepareStatement(updateUserMetaSQL);
+            stmt.setString(1, value);
+            stmt.setLong(2, umetaId);
+            stmt.executeUpdate();
+         } else {
+            SQLUtil.closeQuietly(stmt, rs);
+            stmt = null;
+            rs = null;
+            stmt = conn.prepareStatement(insertUserMetaSQL);
+            stmt.setLong(1, userId);
+            stmt.setString(2, key);
+            stmt.setString(3, value);
+            stmt.executeUpdate();
+         }
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+   }
+
+
+
+
    private final String deletePostIdSQL;
 
    /**

@@ -42,6 +42,7 @@ public class Metrics implements MetricSet {
       this.createUserTimer = metricSource.newTimer();
       this.selectUserTimer = metricSource.newTimer();
       this.userMetadataTimer = metricSource.newTimer();
+      this.clearUserMetaTimer = metricSource.newTimer();
       this.deletePostTimer = metricSource.newTimer();
       this.selectAuthorPostsTimer = metricSource.newTimer();
       this.selectPostsTimer = metricSource.newTimer();
@@ -120,6 +121,7 @@ public class Metrics implements MetricSet {
    Timer createUserTimer;
    Timer selectUserTimer;
    Timer userMetadataTimer;
+   Timer clearUserMetaTimer;
    Timer deletePostTimer;
    Timer selectAuthorPostsTimer;
    Timer selectPostsTimer;

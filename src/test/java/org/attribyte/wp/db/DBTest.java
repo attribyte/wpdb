@@ -78,16 +78,18 @@ public class DBTest {
       user = db().selectUser(createdUser.id);
       assertNotNull(user);
       assertEquals(createdUser.username, user.username);
+      assertEquals(createdUser.username.toLowerCase(), user.slug);
    }
 
    @Test
    public void userByUsername() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "test-slug", username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       user = db().selectUser(createdUser.username);
       assertNotNull(user);
       assertEquals(createdUser.id, user.id);
+      assertEquals(username + "test-slug", user.slug);
    }
 
    @Test

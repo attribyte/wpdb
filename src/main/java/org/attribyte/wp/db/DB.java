@@ -262,7 +262,7 @@ public class DB implements MetricSet {
       PreparedStatement stmt = null;
       ResultSet rs = null;
 
-      String nicename = user.displayName();
+      String nicename = user.slug;
       if(nicename.length() > 49) {
          nicename = nicename.substring(0, 49);
       }
@@ -303,7 +303,7 @@ public class DB implements MetricSet {
       String niceName = Strings.nullToEmpty(rs.getString(3)).trim();
       String displayName = Strings.nullToEmpty(rs.getString(4)).trim();
       String useDisplayName = displayName.isEmpty() ? niceName : displayName;
-      return new User(rs.getLong(1), rs.getString(2), useDisplayName, rs.getString(5), rs.getTimestamp(6).getTime(), ImmutableList.of());
+      return new User(rs.getLong(1), rs.getString(2), useDisplayName, niceName, rs.getString(5), rs.getTimestamp(6).getTime(), ImmutableList.of());
    }
 
    private static final String selectUserByUsernameSQL = selectUserSQL + " WHERE user_login=?";

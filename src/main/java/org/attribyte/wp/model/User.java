@@ -27,7 +27,32 @@ import static org.attribyte.wp.Util.slugify;
 public class User {
 
    /**
-    * Creates a user.
+    * Creates a user with a slug.
+    * @param id The unique id.
+    * @param username The username.
+    * @param displayName The display name.
+    * @param slug The slug.
+    * @param email The email.
+    * @param createTimestamp The create timestamp.
+    * @param metadata Associated metadata.
+    */
+   public User(final long id, final String username, final String displayName,
+               final String slug,
+               final String email,
+               final long createTimestamp,
+               final Collection<Meta> metadata) {
+      this.id = id;
+      this.username = username;
+      this.displayName = displayName;
+      this.slug = slug;
+      this.email = email;
+      this.createTimestamp = createTimestamp;
+      this.metadata = metadata != null ? ImmutableList.copyOf(metadata) : ImmutableList.of();
+   }
+
+
+   /**
+    * Creates a user with a generated slug.
     * @param id The unique id.
     * @param username The username.
     * @param displayName The display name.
@@ -45,7 +70,7 @@ public class User {
       this.email = email;
       this.createTimestamp = createTimestamp;
       this.metadata = metadata != null ? ImmutableList.copyOf(metadata) : ImmutableList.of();
-      this.slug = slugify(displayName);
+      this.slug = slugify(displayName());
    }
 
    /**

@@ -262,7 +262,7 @@ public class DB implements MetricSet {
       PreparedStatement stmt = null;
       ResultSet rs = null;
 
-      String nicename = user.displayName();
+      String nicename = user.slug;
       if(nicename.length() > 49) {
          nicename = nicename.substring(0, 49);
       }

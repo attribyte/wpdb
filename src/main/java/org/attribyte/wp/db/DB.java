@@ -46,7 +46,6 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
@@ -249,8 +248,16 @@ public class DB implements MetricSet {
            "INSERT INTO wp_users (user_login, user_pass, user_nicename, display_name, user_email, user_registered) " +
                    "VALUES (?, ?, ?, ?, ?, NOW())";
 
+   private static final String createUserWithIdSQL =
+           "INSERT INTO wp_users (ID, user_login, user_pass, user_nicename, display_name, user_email, user_registered) " +
+                   "VALUES (?, ?, ?, ?, ?, ?, NOW())";
+
    /**
     * Creates a user.
+    * <p>
+    *    If the {@code id} is > 0, the user will be created with this id, otherwise it
+    *    will be auto-generated.
+    * </p>
     * @param user The user.
     * @param userPass The {@code user_pass} string to use (probably the hash of a default username/password).
     * @return The newly created user.
@@ -272,19 +279,32 @@ public class DB implements MetricSet {
       Timer.Context ctx = metrics.createUserTimer.time();
       try {
          conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(createUserSQL, Statement.RETURN_GENERATED_KEYS);
-         stmt.setString(1, username);
-         stmt.setString(2, Strings.nullToEmpty(userPass));
-         stmt.setString(3, nicename);
-         stmt.setString(4, user.displayName());
-         stmt.setString(5, Strings.nullToEmpty(user.email));
-         stmt.executeUpdate();
-         rs = stmt.getGeneratedKeys();
-         if(rs.next()) {
-            return user.withId(rs.getLong(1));
+         if(user.id > 0L) {
+            stmt = conn.prepareStatement(createUserWithIdSQL);
+            stmt.setLong(1, user.id);
+            stmt.setString(2, username);
+            stmt.setString(3, Strings.nullToEmpty(userPass));
+            stmt.setString(4, nicename);
+            stmt.setString(5, user.displayName());
+            stmt.setString(6, Strings.nullToEmpty(user.email));
+            stmt.executeUpdate();
+            return user;
          } else {
-            throw new SQLException("Problem creating user (no generated id)");
+            stmt = conn.prepareStatement(createUserSQL, Statement.RETURN_GENERATED_KEYS);
+            stmt.setString(1, username);
+            stmt.setString(2, Strings.nullToEmpty(userPass));
+            stmt.setString(3, nicename);
+            stmt.setString(4, user.displayName());
+            stmt.setString(5, Strings.nullToEmpty(user.email));
+            stmt.executeUpdate();
+            rs = stmt.getGeneratedKeys();
+            if(rs.next()) {
+               return user.withId(rs.getLong(1));
+            } else {
+               throw new SQLException("Problem creating user (no generated id)");
+            }
          }
+
       } finally {
          ctx.stop();
          closeQuietly(conn, stmt, rs);
@@ -399,6 +419,28 @@ public class DB implements MetricSet {
             usernameCache.put(username, user);
          }
          return user;
+      }
+   }
+
+   private static final String deleteUserSQL = "DELETE FROM wp_users WHERE ID=?";
+
+   /**
+    * Deletes a user by id.
+    * @param userId The user id.
+    * @return Was the user deleted?
+    * @throws SQLException on database error.
+    */
+   public boolean deleteUser(final long userId) throws SQLException {
+
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(deleteUserSQL);
+         stmt.setLong(1, userId);
+         return stmt.executeUpdate() > 0;
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt);
       }
    }
 

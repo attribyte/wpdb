@@ -60,7 +60,6 @@ public class DBTest {
       return _db;
    }
 
-
    @Test
    public void createUser() throws Exception {
       String username = StringUtil.randomString(8);
@@ -68,6 +67,29 @@ public class DBTest {
       User createdUser = db().createUser(user, "XXXX");
       assertNotNull(createdUser);
       assertTrue(createdUser.id > 0L);
+   }
+
+   @Test
+   public void deleteUser() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      assertNotNull(createdUser);
+      assertTrue(createdUser.id > 0L);
+      boolean deleted = db().deleteUser(createdUser.id);
+      assertTrue(deleted);
+      assertNull(db().resolveUser(createdUser.id));
+   }
+
+   @Test
+   public void createUserWithId() throws Exception {
+      db().deleteUser(14L);
+      String username = StringUtil.randomString(8);
+      User user = new User(14L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      db().createUser(user, "XXXX");
+      User createdUser = db().resolveUser(14L);
+      assertNotNull(createdUser);
+      assertEquals(14L, createdUser.id);
    }
 
    @Test

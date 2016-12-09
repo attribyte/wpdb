@@ -79,16 +79,16 @@ public class User {
     * @return The user with new id.
     */
    public User withId(final long id) {
-      return new User(id, username, displayName, email, createTimestamp, metadata);
+      return new User(id, username, displayName, slug, email, createTimestamp, metadata);
    }
 
    /**
     * Creates a user with added metadata.
-    * @param meta The metadata.
+    * @param metadata The metadata.
     * @return The user with metadata added.
     */
-   public User withMetadata(final List<Meta> meta) {
-      return new User(id, username, displayName, email, createTimestamp, metadata);
+   public User withMetadata(final List<Meta> metadata) {
+      return new User(id, username, displayName, slug, email, createTimestamp, metadata);
    }
 
    /**

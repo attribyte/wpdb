@@ -221,10 +221,10 @@ public class DBTest {
       assertNotNull(posts);
       assertTrue(posts.size() > 0);
 
-      TaxonomyTerm test0 = db().resolveTaxonomyTerm("test_taxonomy", "test0");
+      TaxonomyTerm test0 = db().resolveTaxonomyTerm("test_taxonomy", "test0", "desctest0");
       assertNotNull(test0);
 
-      TaxonomyTerm test1 = db().resolveTaxonomyTerm("test_taxonomy", "test1");
+      TaxonomyTerm test1 = db().resolveTaxonomyTerm("test_taxonomy", "test1", "desctest1");
       assertNotNull(test1);
 
       posts = db().selectPostIds(Post.Type.POST, Post.Status.PUBLISH, ImmutableList.of(test0),Post.Sort.DESC, new Paging(0, 2));
@@ -483,9 +483,21 @@ public class DBTest {
    }
 
    @Test
+   public void setTaxonomyTermDescription() throws Exception {
+      String termName = StringUtil.randomString(8);
+      TaxonomyTerm term0 = db().createTaxonomyTerm("test_taxonomy", termName, termName+"-slug0", termName+"-description0");
+      boolean updated = db().setTaxonomyTermDescription("test_taxonomy", termName, termName+"-description-1");
+      assertTrue(updated);
+      TaxonomyTerm matchTerm = db().selectTaxonomyTerm("test_taxonomy", termName);
+      assertNotNull(matchTerm);
+      assertEquals(term0.id, matchTerm.id);
+      assertEquals(termName + "-description-1", matchTerm.description);
+   }
+
+   @Test
    public void resolveTaxonomyTerm() throws Exception {
       String termName = StringUtil.randomString(8);
-      TaxonomyTerm term0 = db().resolveTaxonomyTerm("test_taxonomy", termName);
+      TaxonomyTerm term0 = db().resolveTaxonomyTerm("test_taxonomy", termName, termName +"-description");
       assertNotNull(term0);
       assertTrue(term0.id > 0);
       assertNotNull(term0.term);
@@ -499,13 +511,14 @@ public class DBTest {
    @Test
    public void resolveTaxonomyTermWithCache() throws Exception {
       String termName = StringUtil.randomString(8);
-      TaxonomyTerm term0 = db().resolveTaxonomyTerm("test_taxonomy_with_cache", termName);
+      TaxonomyTerm term0 = db().resolveTaxonomyTerm("test_taxonomy_with_cache", termName, termName + "-description");
       assertNotNull(term0);
       assertTrue(term0.id > 0);
       assertNotNull(term0.term);
       assertNotNull(db().selectTerm(term0.id));
+      assertEquals(termName + "-description", term0.description);
 
-      TaxonomyTerm matchTerm = db().resolveTaxonomyTerm("test_taxonomy_with_cache", termName);
+      TaxonomyTerm matchTerm = db().resolveTaxonomyTerm("test_taxonomy_with_cache", termName, termName + "-description");
       assertNotNull(matchTerm);
       assertEquals(term0.id, matchTerm.id);
    }

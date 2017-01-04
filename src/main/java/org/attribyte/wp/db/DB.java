@@ -195,6 +195,8 @@ public class DB implements MetricSet {
 
       this.insertTaxonomyTermSQL = "INSERT INTO " + termTaxonomyTableName + "(term_id, taxonomy, description) VALUES (?,?, ?)";
 
+      this.updateTaxonomyTermDescriptionSQL = "UPDATE " + termTaxonomyTableName + " SET description=? WHERE term_id=? AND taxonomy=?";
+
       this.clearPostTermsSQL = "DELETE FROM " + termRelationshipsTableName + " WHERE object_id=?";
 
       this.clearPostTermSQL = "DELETE FROM " + termRelationshipsTableName + " WHERE object_id=? AND term_taxonomy_id=?";
@@ -1594,6 +1596,41 @@ public class DB implements MetricSet {
       return new TaxonomyTerm(taxonomyTermId, taxonomy, selectTerm(termId), description);
    }
 
+   final String updateTaxonomyTermDescriptionSQL;
+
+   /**
+    * Sets the description for a taxonomy term.
+    * @param taxonomy The taxonomy.
+    * @param name The term name.
+    * @param description The description.
+    * @return Was the description set?
+    * @throws SQLException on database error.
+    */
+   public boolean setTaxonomyTermDescription(final String taxonomy, final String name,
+                                             final String description) throws SQLException {
+
+      TaxonomyTerm term = selectTaxonomyTerm(taxonomy, name);
+      if(term == null || term.term == null) {
+         return false;
+      }
+
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      Timer.Context ctx = metrics.updateTaxonomyTermTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(updateTaxonomyTermDescriptionSQL);
+         stmt.setString(1, Strings.nullToEmpty(description));
+         stmt.setLong(2, term.term.id);
+         stmt.setString(3, taxonomy);
+         return stmt.executeUpdate() > 0;
+      } finally {
+         ctx.stop();
+         closeQuietly(conn, stmt);
+      }
+   }
+
+
    final String insertTaxonomyTermSQL;
 
    /**
@@ -1640,10 +1677,11 @@ public class DB implements MetricSet {
     * </p>
     * @param taxonomy The taxonomy.
     * @param name The term name.
+    * @param description The description to be used of the taxonmy term is created.
     * @return The taxonomy term.
     * @throws SQLException on database error.
     */
-   public TaxonomyTerm resolveTaxonomyTerm(final String taxonomy, final String name) throws SQLException {
+   public TaxonomyTerm resolveTaxonomyTerm(final String taxonomy, final String name, final String description) throws SQLException {
 
       TaxonomyTerm term;
       Cache<String, TaxonomyTerm> taxonomyTermCache = taxonomyTermCaches.get(taxonomy);
@@ -1658,7 +1696,7 @@ public class DB implements MetricSet {
 
       term = selectTaxonomyTerm(taxonomy, name);
       if(term == null) {
-         term = createTaxonomyTerm(taxonomy, name, slugify(name), "");
+         term = createTaxonomyTerm(taxonomy, name, slugify(name), description);
       }
 
       if(taxonomyTermCache != null) {
@@ -1782,7 +1820,8 @@ public class DB implements MetricSet {
    /**
     * Sets terms associated with a post, replacing any existing terms with the specified taxonomy.
     * <p>
-    *    Uses cache, if configured, to resolve.
+    *    Uses cache, if configured, to resolve. If terms are created, they will
+    *    have an empty description.
     * </p>
     * @param postId The post id.
     * @param taxonomy The taxonomy.
@@ -1798,7 +1837,7 @@ public class DB implements MetricSet {
 
       List<TaxonomyTerm> taxonomyTerms = Lists.newArrayListWithExpectedSize(terms.size());
       for(String term : terms) {
-         taxonomyTerms.add(resolveTaxonomyTerm(taxonomy, term));
+         taxonomyTerms.add(resolveTaxonomyTerm(taxonomy, term, ""));
       }
 
       Connection conn = null;

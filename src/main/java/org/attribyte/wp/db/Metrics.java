@@ -39,6 +39,7 @@ public class Metrics implements MetricSet {
       this.taxonomyTermResolveTimer = metricSource.newTimer();
       this.selectTaxonomyTermTimer = metricSource.newTimer();
       this.createTaxonomyTermTimer = metricSource.newTimer();
+      this.updateTaxonomyTermTimer = metricSource.newTimer();
       this.createUserTimer = metricSource.newTimer();
       this.selectUserTimer = metricSource.newTimer();
       this.userMetadataTimer = metricSource.newTimer();
@@ -80,6 +81,7 @@ public class Metrics implements MetricSet {
               .put("resolve-taxonomy-term", taxonomyTermResolveTimer)
               .put("select-taxonomy-term", selectTaxonomyTermTimer)
               .put("create-taxonomy-term", createTaxonomyTermTimer)
+              .put("update-taxonomy-term", updateTaxonomyTermTimer)
               .put("create-user", createUserTimer)
               .put("select-user", selectUserTimer)
               .put("select-user-metadata", userMetadataTimer)
@@ -111,40 +113,41 @@ public class Metrics implements MetricSet {
               .build();
    }
 
-   Timer optionSelectTimer;
-   Timer postTermsSelectTimer;
-   Timer postTermsSetTimer;
-   Timer postTermsClearTimer;
-   Timer taxonomyTermResolveTimer;
-   Timer selectTaxonomyTermTimer;
-   Timer createTaxonomyTermTimer;
-   Timer createUserTimer;
-   Timer selectUserTimer;
-   Timer userMetadataTimer;
-   Timer clearUserMetaTimer;
-   Timer deletePostTimer;
-   Timer selectAuthorPostsTimer;
-   Timer selectPostsTimer;
-   Timer selectModPostsTimer;
-   Timer selectPostIdsTimer;
-   Timer selectChildrenTimer;
-   Timer deleteChildrenTimer;
-   Timer selectSlugPostsTimer;
-   Timer selectPostTimer;
-   Timer selectPostMapTimer;
-   Timer insertPostTimer;
-   Timer updatePostTimer;
-   Timer clearPostMetaTimer;
-   Timer selectPostMetaTimer;
-   Timer setPostMetaTimer;
-   Timer createTermTimer;
-   Timer selectTermTimer;
-   Timer resolvePostTimer;
-   Timer selectBlogsTimer;
-   Meter userCacheHits;
-   Meter userCacheTries;
-   Meter usernameCacheHits;
-   Meter usernameCacheTries;
-   Meter taxonomyTermCacheHits;
-   Meter taxonomyTermCacheTries;
+   final Timer optionSelectTimer;
+   final Timer postTermsSelectTimer;
+   final Timer postTermsSetTimer;
+   final Timer postTermsClearTimer;
+   final Timer taxonomyTermResolveTimer;
+   final Timer selectTaxonomyTermTimer;
+   final Timer createTaxonomyTermTimer;
+   final Timer updateTaxonomyTermTimer;
+   final Timer createUserTimer;
+   final Timer selectUserTimer;
+   final Timer userMetadataTimer;
+   final Timer clearUserMetaTimer;
+   final Timer deletePostTimer;
+   final Timer selectAuthorPostsTimer;
+   final Timer selectPostsTimer;
+   final Timer selectModPostsTimer;
+   final Timer selectPostIdsTimer;
+   final Timer selectChildrenTimer;
+   final Timer deleteChildrenTimer;
+   final Timer selectSlugPostsTimer;
+   final Timer selectPostTimer;
+   final Timer selectPostMapTimer;
+   final Timer insertPostTimer;
+   final Timer updatePostTimer;
+   final Timer clearPostMetaTimer;
+   final Timer selectPostMetaTimer;
+   final Timer setPostMetaTimer;
+   final Timer createTermTimer;
+   final Timer selectTermTimer;
+   final Timer resolvePostTimer;
+   final Timer selectBlogsTimer;
+   final Meter userCacheHits;
+   final Meter userCacheTries;
+   final Meter usernameCacheHits;
+   final Meter usernameCacheTries;
+   final Meter taxonomyTermCacheHits;
+   final Meter taxonomyTermCacheTries;
 }

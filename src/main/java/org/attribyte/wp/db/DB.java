@@ -1670,7 +1670,34 @@ public class DB implements MetricSet {
    }
 
    /**
-    * Resolves a taxonomy term, creating if required.
+    * Resolves a taxonomy term.
+    * @param taxonomy The taxonomy.
+    * @param name The term name.
+    * @return The taxonomy term or {@code null} if not found.
+    * @throws SQLException on database error.
+    */
+   public TaxonomyTerm resolveTaxonomyTerm(final String taxonomy, final String name) throws SQLException {
+      TaxonomyTerm term;
+      Cache<String, TaxonomyTerm> taxonomyTermCache = taxonomyTermCaches.get(taxonomy);
+      if(taxonomyTermCache != null) {
+         metrics.taxonomyTermCacheTries.mark();
+         term = taxonomyTermCache.getIfPresent(name);
+         if(term != null) {
+            metrics.taxonomyTermCacheHits.mark();
+            return term;
+         }
+      }
+
+      term = selectTaxonomyTerm(taxonomy, name);
+      if(term != null && taxonomyTermCache != null) {
+         taxonomyTermCache.put(name, term);
+      }
+
+      return term;
+   }
+
+   /**
+    * Resolves a taxonomy term, creating one if it does not exist.
     * <p>
     *    If taxonomy term cache is configured for this taxonomy, it
     *    is used for resolution.

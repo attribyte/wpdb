@@ -495,7 +495,7 @@ public class DBTest {
    }
 
    @Test
-   public void resolveTaxonomyTerm() throws Exception {
+   public void resolveTaxonomyTermWithCreate() throws Exception {
       String termName = StringUtil.randomString(8);
       TaxonomyTerm term0 = db().resolveTaxonomyTerm("test_taxonomy", termName, termName +"-description");
       assertNotNull(term0);
@@ -506,6 +506,20 @@ public class DBTest {
       TaxonomyTerm matchTerm = db().selectTaxonomyTerm("test_taxonomy", termName);
       assertNotNull(matchTerm);
       assertEquals(term0.id, matchTerm.id);
+   }
+
+   @Test
+   public void resolveTaxonomyTerm() throws Exception {
+      String termName = StringUtil.randomString(8);
+      TaxonomyTerm term0 = db().resolveTaxonomyTerm("test_taxonomy", termName, termName +"-description");
+      assertNotNull(term0);
+
+      TaxonomyTerm matchTerm = db().resolveTaxonomyTerm("test_taxonomy", termName);
+      assertNotNull(matchTerm);
+      assertEquals(term0.id, matchTerm.id);
+
+      matchTerm = db().resolveTaxonomyTerm("test_taxonomy", termName +"-invalid");
+      assertNull(matchTerm);
    }
 
    @Test

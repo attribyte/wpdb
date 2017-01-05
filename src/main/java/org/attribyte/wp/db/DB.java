@@ -336,6 +336,8 @@ public class DB implements MetricSet {
 
    private static final String selectUserByUsernameSQL = selectUserSQL + " WHERE user_login=?";
 
+   private static final String selectUserByNicenameSQL = selectUserSQL + " WHERE user_nicename=?";
+
    /**
     * Selects a user by username.
     * <p>
@@ -354,6 +356,35 @@ public class DB implements MetricSet {
       try {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(selectUserByUsernameSQL);
+         stmt.setString(1, username);
+         rs = stmt.executeQuery();
+         return rs.next() ? userFromResultSet(rs) : null;
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+   }
+
+   /**
+    * Finds a user where {@code username} or {@code nicename} matches.
+    * @param username The username.
+    * @return The user or {@code null} if not found.
+    * @throws SQLException on database error.
+    */
+   public User findUser(final String username) throws SQLException {
+
+      User user = selectUser(username);
+      if(user != null) {
+         return user;
+      }
+
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+      Timer.Context ctx = metrics.selectUserTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(selectUserByNicenameSQL);
          stmt.setString(1, username);
          rs = stmt.executeQuery();
          return rs.next() ? userFromResultSet(rs) : null;

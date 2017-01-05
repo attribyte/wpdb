@@ -115,6 +115,17 @@ public class DBTest {
    }
 
    @Test
+   public void findUser() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "test-slug", username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      user = db().findUser(createdUser.slug);
+      assertNotNull(user);
+      assertEquals(createdUser.id, user.id);
+      assertEquals(username + "test-slug", user.slug);
+   }
+
+   @Test
    public void userMetadata() throws Exception {
       String username = StringUtil.randomString(8);
       User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());

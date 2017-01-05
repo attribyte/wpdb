@@ -20,6 +20,7 @@ Features
 * Set and delete post children, e.g. attachments.
 * Set and delete post metadata.
 * Set and delete terms, taxonomy terms and their post associations.
+* Set and delete term metadata.
 * Optional taxonomy terms cache.   
 * Select options e.g. site configuration.
 * Select public blogs.

@@ -469,6 +469,31 @@ public class DBTest {
    }
 
    @Test
+   public void termMetadata() throws Exception {
+      String termName = StringUtil.randomString(8);
+      Term term0 = db().createTerm(termName, "slug0-" + termName);
+      assertNotNull(term0);
+      assertTrue(term0.id > 0);
+      List<Meta> metaList = Lists.newArrayList();
+      metaList.add(new Meta(0L, "test0", "mval0"));
+      metaList.add(new Meta(0L, "test1", "mval1"));
+      List<Meta> termMeta = db().selectTermMeta(term0.id);
+      assertNotNull(termMeta);
+      assertEquals(0, termMeta.size());
+      db().setTermMeta(term0.id, metaList);
+      termMeta = db().selectTermMeta(term0.id);
+      assertNotNull(termMeta);
+      assertEquals(2, termMeta.size());
+      metaList.remove(0);
+      db().setTermMeta(term0.id, metaList);
+      termMeta = db().selectTermMeta(term0.id);
+      assertEquals(1, termMeta.size());
+      db().clearTermMeta(term0.id);
+      termMeta = db().selectTermMeta(term0.id);
+      assertEquals(0, termMeta.size());
+   }
+
+   @Test
    public void createTaxonomyTerm() throws Exception {
       String termName = StringUtil.randomString(8);
       TaxonomyTerm term0 = db().createTaxonomyTerm("test_taxonomy", termName, termName+"-slug0", termName+"-description0");

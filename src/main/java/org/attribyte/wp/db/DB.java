@@ -137,6 +137,7 @@ public class DB implements MetricSet {
       final String postMetaTableName;
       final String termTaxonomyTableName;
       final String termsTableName;
+      final String termsMetaTableName;
       final String optionsTableName;
 
       if(siteId < 2) {
@@ -144,16 +145,15 @@ public class DB implements MetricSet {
          postMetaTableName = "wp_postmeta";
          optionsTableName = "wp_options";
          termsTableName = "wp_terms";
+         termsMetaTableName = "wp_termmeta";
          termRelationshipsTableName = "wp_term_relationships";
          termTaxonomyTableName = "wp_term_taxonomy";
       } else {
          this.postsTableName = "wp_" + siteId + "_posts";
-
-         System.out.println("posts table name is " + this.postsTableName);
-
          postMetaTableName = "wp_" + siteId + "_postmeta";
          optionsTableName = "wp_" + siteId + "_options";
          termsTableName = "wp_" + siteId + "_terms";
+         termsMetaTableName = "wp_" + siteId + "_termmeta";
          termRelationshipsTableName = "wp_" + siteId + "_term_relationships";
          termTaxonomyTableName = "wp_" + siteId + "_term_taxonomy";
       }
@@ -204,6 +204,12 @@ public class DB implements MetricSet {
       this.insertPostTermSQL = "INSERT IGNORE INTO " + termRelationshipsTableName + " (object_id, term_taxonomy_id, term_order) VALUES (?,?,?)";
 
       this.selectPostTermsSQL = "SELECT term_taxonomy_id FROM " + termRelationshipsTableName + " WHERE object_id=? ORDER BY term_order ASC";
+
+      this.selectTermMetaSQL = "SELECT meta_id, meta_key, meta_value FROM " + termsMetaTableName + " WHERE term_id=?";
+
+      this.insertTermMetaSQL = "INSERT INTO " + termsMetaTableName + "(term_id, meta_key, meta_value) VALUES (?,?,?)";
+
+      this.deleteTermMetaSQL = "DELETE FROM " + termsMetaTableName + " WHERE term_id=?";
 
       this.selectPostMetaSQL = "SELECT meta_id, meta_key, meta_value FROM " + postMetaTableName + " WHERE post_id=?";
 
@@ -1462,6 +1468,97 @@ public class DB implements MetricSet {
          stmt = conn.prepareStatement(insertPostMetaSQL);
          for(Meta meta : postMeta) {
             stmt.setLong(1, postId);
+            stmt.setString(2, meta.key);
+            stmt.setString(3, meta.value);
+            stmt.executeUpdate();
+         }
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt);
+      }
+   }
+
+
+   private final String deleteTermMetaSQL;
+
+   /**
+    * Clears all metadata for a term.
+    * @param termId The term id.
+    * @throws SQLException on database error.
+    */
+   public void clearTermMeta(final long termId) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      Timer.Context ctx = metrics.clearTermMetaTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(deleteTermMetaSQL);
+         stmt.setLong(1, termId);
+         stmt.executeUpdate();
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt);
+      }
+   }
+
+
+   private final String selectTermMetaSQL;
+
+   /**
+    * Selects metadata for a term.
+    * @param termId The term id.
+    * @return The metadata.
+    * @throws SQLException on database error.
+    */
+   public List<Meta> selectTermMeta(final long termId) throws SQLException {
+
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+      List<Meta> meta = Lists.newArrayListWithExpectedSize(8);
+      Timer.Context ctx = metrics.selectTermMetaTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(selectTermMetaSQL);
+         stmt.setLong(1, termId);
+         rs = stmt.executeQuery();
+         while(rs.next()) {
+            meta.add(new Meta(rs.getLong(1), rs.getString(2), rs.getString(3)));
+         }
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+
+      return meta;
+   }
+
+   final String insertTermMetaSQL;
+
+   /**
+    * Sets metadata for a term.
+    * <p>
+    *    Clears existing metadata.
+    * </p>
+    * @param termId The term id.
+    * @param termMeta The metadata.
+    * @throws SQLException on database error.
+    */
+   public void setTermMeta(final long termId, final List<Meta> termMeta) throws SQLException {
+
+      clearTermMeta(termId);
+
+      if(termMeta == null || termMeta.size() == 0) {
+         return;
+      }
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      Timer.Context ctx = metrics.setTermMetaTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(insertTermMetaSQL);
+         for(Meta meta : termMeta) {
+            stmt.setLong(1, termId);
             stmt.setString(2, meta.key);
             stmt.setString(3, meta.value);
             stmt.executeUpdate();

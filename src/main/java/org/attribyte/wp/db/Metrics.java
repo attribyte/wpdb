@@ -59,6 +59,9 @@ public class Metrics implements MetricSet {
       this.clearPostMetaTimer = metricSource.newTimer();
       this.selectPostMetaTimer = metricSource.newTimer();
       this.setPostMetaTimer = metricSource.newTimer();
+      this.clearTermMetaTimer = metricSource.newTimer();
+      this.selectTermMetaTimer = metricSource.newTimer();
+      this.setTermMetaTimer = metricSource.newTimer();
       this.createTermTimer = metricSource.newTimer();
       this.selectTermTimer = metricSource.newTimer();
       this.resolvePostTimer = metricSource.newTimer();
@@ -102,6 +105,9 @@ public class Metrics implements MetricSet {
               .put("set-post-meta", setPostMetaTimer)
               .put("clear-post-meta", clearPostMetaTimer)
               .put("select-post-meta", selectPostMetaTimer)
+              .put("set-term-meta", setPostMetaTimer)
+              .put("clear-term-meta", clearPostMetaTimer)
+              .put("select-term-meta", selectPostMetaTimer)
               .put("create-term", createTermTimer)
               .put("select-term", selectTermTimer)
               .put("try-user-cache", userCacheTries)
@@ -140,6 +146,9 @@ public class Metrics implements MetricSet {
    final Timer clearPostMetaTimer;
    final Timer selectPostMetaTimer;
    final Timer setPostMetaTimer;
+   final Timer clearTermMetaTimer;
+   final Timer selectTermMetaTimer;
+   final Timer setTermMetaTimer;
    final Timer createTermTimer;
    final Timer selectTermTimer;
    final Timer resolvePostTimer;

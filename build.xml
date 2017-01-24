@@ -9,7 +9,7 @@
     <property name="dist" location="dist" />
     <property name="groupId" value="org.attribyte" />
     <property name="artifactId" value="wpdb" />
-    <property name="version" value="1.0.0" />
+    <property name="version" value="1.0.1" />
     <property name="jar" value="${dist}/lib/${artifactId}-${version}.jar" />
     <property name="test-jar" value="${dist}/lib/${artifactId}-test-${version}.jar" />
     <property name="javadoc-jar" value="${dist}/lib/${artifactId}-${version}-javadoc.jar" />

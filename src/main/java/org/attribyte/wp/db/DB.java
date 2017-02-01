@@ -242,6 +242,9 @@ public class DB implements MetricSet {
               "post_excerpt=?, post_status=?, post_name=?, post_modified=?, post_modified_gmt=?, post_parent=?, " +
               "guid=?, post_type=?, post_mime_type=? WHERE ID=?";
 
+      this.updatePostModifiedSQL = "UPDATE " + postsTableName +" SET post_modified=?, post_modified_gmt=? WHERE ID=?";
+
+      this.updatePostCommentStatusSQL = "UPDATE " + postsTableName + " SET comment_status=?, ping_status=? WHERE ID=?";
 
       this.selectModPostsSQL = selectPostSQL + postsTableName +
               " WHERE post_modified > ? OR (post_modified=? AND ID > ?) ORDER BY post_modified ASC, ID ASC LIMIT ?";
@@ -1288,6 +1291,32 @@ public class DB implements MetricSet {
       return posts;
    }
 
+   private final String updatePostCommentStatusSQL;
+
+   /**
+    * Updates the comment status for a post.
+    * @param postId The post id.
+    * @param commentStatus The new comment status ('open', 'closed').
+    * @param pingStatus The new ping status ('open', 'closed').
+    * @throws SQLException on database error.
+    */
+   public void updateCommentStatus(final long postId,
+                                   final Post.CommentStatus commentStatus,
+                                   final Post.CommentStatus pingStatus) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(updatePostCommentStatusSQL);
+         stmt.setString(1, commentStatus.toString().toLowerCase());
+         stmt.setString(2, pingStatus.toString().toLowerCase());
+         stmt.setLong(3, postId);
+         stmt.executeUpdate();
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt);
+      }
+   }
+
    private final String updatePostSQL;
 
    /**
@@ -1328,6 +1357,38 @@ public class DB implements MetricSet {
          stmt.setLong(15, post.id);
          stmt.executeUpdate();
          return post;
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt);
+      }
+   }
+
+   private final String updatePostModifiedSQL;
+
+   /**
+    * "Touches" the last modified time for a post.
+    * @param postId The post id.
+    * @param tz The local time zone.
+    * @throws SQLException on database error or invalid post id.
+    */
+   public void touchPost(final long postId, final TimeZone tz) throws SQLException {
+      if(postId < 1L) {
+         throw new SQLException("The post id must be specified for update");
+      }
+
+      long modifiedTimestamp = System.currentTimeMillis();
+
+      int offset = tz.getOffset(modifiedTimestamp);
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      Timer.Context ctx = metrics.updatePostTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(updatePostModifiedSQL);
+         stmt.setTimestamp(1, new Timestamp(modifiedTimestamp));
+         stmt.setTimestamp(2, new Timestamp(modifiedTimestamp - offset));
+         stmt.setLong(3, postId);
+         stmt.executeUpdate();
       } finally {
          ctx.stop();
          SQLUtil.closeQuietly(conn, stmt);

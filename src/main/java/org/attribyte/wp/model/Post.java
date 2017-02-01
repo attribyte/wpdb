@@ -63,6 +63,11 @@ public class Post {
       PUBLISH,
 
       /**
+       * Post is scheduled to be published.
+       */
+      FUTURE,
+
+      /**
        * Status is inherited from the parent.
        */
       INHERIT,
@@ -85,6 +90,7 @@ public class Post {
             case "private" : return PRIVATE;
             case "publish" : return PUBLISH;
             case "inherit" : return INHERIT;
+            case "future" : return FUTURE;
             default: return UNKNOWN;
          }
       }

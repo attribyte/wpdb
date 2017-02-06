@@ -242,6 +242,8 @@ public class DB implements MetricSet {
               "post_excerpt=?, post_status=?, post_name=?, post_modified=?, post_modified_gmt=?, post_parent=?, " +
               "guid=?, post_type=?, post_mime_type=? WHERE ID=?";
 
+      this.updatePostTimestampsSQL = "UPDATE " + postsTableName +
+              " SET post_date=?, post_date_gmt=?, post_modified=?, post_modified_gmt=? WHERE ID=?";
 
       this.selectModPostsSQL = selectPostSQL + postsTableName +
               " WHERE post_modified > ? OR (post_modified=? AND ID > ?) ORDER BY post_modified ASC, ID ASC LIMIT ?";
@@ -1286,6 +1288,37 @@ public class DB implements MetricSet {
          }
       }
       return posts;
+   }
+
+   private final String updatePostTimestampsSQL;
+
+   /**
+    * Updates only the timestamp fields for a post.
+    * @param postId The post to update.
+    * @param publishTimestamp The publish timestamp.
+    * @param modifiedTimestamp The modified timestamp.
+    * @param tz The local time zone.
+    * @return Were the timestamps modified?
+    * @throws SQLException on database error or missing post id.
+    */
+   public boolean updatePostTimestamps(long postId, final long publishTimestamp, final long modifiedTimestamp, final TimeZone tz) throws SQLException {
+      int offset = tz.getOffset(publishTimestamp);
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      Timer.Context ctx = metrics.updatePostTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(updatePostTimestampsSQL);
+         stmt.setTimestamp(1, new Timestamp(publishTimestamp));
+         stmt.setTimestamp(2, new Timestamp(publishTimestamp - offset));
+         stmt.setTimestamp(3, new Timestamp(modifiedTimestamp));
+         stmt.setTimestamp(4, new Timestamp(modifiedTimestamp - offset));
+         stmt.setLong(5, postId);
+         return stmt.executeUpdate() > 0;
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt);
+      }
    }
 
    private final String updatePostSQL;

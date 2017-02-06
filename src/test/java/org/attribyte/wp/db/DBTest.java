@@ -198,6 +198,26 @@ public class DBTest {
    }
 
    @Test
+   public void updatePostTimestamps() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      db().deletePost(1000);
+      Post testPost = createTestPost(createdUser, 1000);
+      db().insertPost(testPost, TimeZone.getDefault());
+      Post.Builder insertedPost = db().selectPost(testPost.id);
+      assertNotNull(insertedPost);
+
+      long publishTime = System.currentTimeMillis() - 5000L;
+      long modifiedTime = System.currentTimeMillis();
+
+      db().updatePostTimestamps(testPost.id, publishTime, modifiedTime, TimeZone.getDefault());
+      Post.Builder checkPost = db().selectPost(testPost.id);
+      assertEquals((int)(publishTime/1000L), (int)(checkPost.getPublishTimestamp()/1000L));
+      assertEquals((int)(modifiedTime/1000L), (int)(checkPost.getModifiedTimestamp()/1000L));
+   }
+
+   @Test
    public void parentChild() throws Exception {
       String username = StringUtil.randomString(8);
       User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());

@@ -249,6 +249,8 @@ public class DB implements MetricSet {
       this.updatePostTimestampsSQL = "UPDATE " + postsTableName +
               " SET post_date=?, post_date_gmt=?, post_modified=?, post_modified_gmt=? WHERE ID=?";
 
+      this.updatePostContentSQL = "UPDATE " + postsTableName + " SET post_content=? WHERE ID=?";
+
       this.selectModPostsSQL = selectPostSQL + postsTableName +
               " WHERE post_modified > ? OR (post_modified=? AND ID > ?) ORDER BY post_modified ASC, ID ASC LIMIT ?";
 
@@ -1318,6 +1320,31 @@ public class DB implements MetricSet {
          stmt.setTimestamp(3, new Timestamp(modifiedTimestamp));
          stmt.setTimestamp(4, new Timestamp(modifiedTimestamp - offset));
          stmt.setLong(5, postId);
+         return stmt.executeUpdate() > 0;
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt);
+      }
+   }
+
+   private final String updatePostContentSQL;
+
+   /**
+    * Updates the content for a post.
+    * @param postId The post to update.
+    * @param content The new content.
+    * @return Was the post modified?
+    * @throws SQLException on database error or missing post id.
+    */
+   public boolean updatePostContent(long postId, final String content) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      Timer.Context ctx = metrics.updatePostTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(updatePostContentSQL);
+         stmt.setString(1, content);
+         stmt.setLong(2, postId);
          return stmt.executeUpdate() > 0;
       } finally {
          ctx.stop();

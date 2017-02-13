@@ -231,6 +231,18 @@ public class DBTest {
       assertEquals("this is the new content", insertedPost.getContent());
    }
 
+   @Test
+   public void updatePostStatus() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      db().deletePost(1000);
+      Post testPost = createTestPost(createdUser, 1000);
+      db().insertPost(testPost, TimeZone.getDefault());
+      db().updatePostStatus(testPost.id, Post.Status.PRIVATE);
+      Post.Builder insertedPost = db().selectPost(testPost.id);
+      assertEquals(Post.Status.PRIVATE, insertedPost.getStatus());
+   }
 
    @Test
    public void parentChild() throws Exception {

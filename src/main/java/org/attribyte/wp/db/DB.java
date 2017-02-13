@@ -246,6 +246,8 @@ public class DB implements MetricSet {
 
       this.updatePostCommentStatusSQL = "UPDATE " + postsTableName + " SET comment_status=?, ping_status=? WHERE ID=?";
 
+      this.updatePostStatusSQL = "UPDATE " + postsTableName + " SET post_status=? WHERE ID=?";
+
       this.updatePostTimestampsSQL = "UPDATE " + postsTableName +
               " SET post_date=?, post_date_gmt=?, post_modified=?, post_modified_gmt=? WHERE ID=?";
 
@@ -1348,6 +1350,29 @@ public class DB implements MetricSet {
          return stmt.executeUpdate() > 0;
       } finally {
          ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt);
+      }
+   }
+
+   private final String updatePostStatusSQL;
+
+   /**
+    * Updates the status for a post.
+    * @param postId The post id.
+    * @param status The new status.
+    * @throws SQLException on database error.
+    */
+   public void updatePostStatus(final long postId,
+                                final Post.Status status) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(updatePostStatusSQL);
+         stmt.setString(1, status.toString().toLowerCase());
+         stmt.setLong(2, postId);
+         stmt.executeUpdate();
+      } finally {
          SQLUtil.closeQuietly(conn, stmt);
       }
    }

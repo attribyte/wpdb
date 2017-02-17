@@ -383,7 +383,6 @@ public class ShortcodeParser {
                         handler.shortcode(ShortcodeParser.parseStart(buf.toString()));
                         buf.setLength(0);
                      } catch(ParseException pe) {
-                        pe.printStackTrace();
                         handler.parseError(buf.toString(), pe);
                      }
                      state = HandlerParseState.TEXT;

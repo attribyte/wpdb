@@ -15,6 +15,7 @@
 package org.attribyte.wp.model;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 
 import java.text.ParseException;
 import java.util.Map;
@@ -257,7 +258,7 @@ public class ShortcodeParser {
    private static Map<String, String> parseAttributes(String attrString) throws ParseException {
 
       AttributeString str = new AttributeString(attrString);
-      ImmutableMap.Builder<String, String> attributes = ImmutableMap.builder(); //Immutable map preserves entry order.
+      Map<String, String> attributes = Maps.newLinkedHashMapWithExpectedSize(4); //Preserve order...
       AttrState state = AttrState.NAME;
       String currName = "";
       String currString = "";
@@ -278,7 +279,7 @@ public class ShortcodeParser {
                break;
          }
       }
-      return attributes.build();
+      return attributes;
    }
 
    /**

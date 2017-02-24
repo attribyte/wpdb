@@ -253,6 +253,10 @@ public class DB implements MetricSet {
 
       this.updatePostContentSQL = "UPDATE " + postsTableName + " SET post_content=? WHERE ID=?";
 
+      this.updatePostExcerptSQL = "UPDATE " + postsTableName + " SET post_excerpt=? WHERE ID=?";
+
+      this.updatePostTitleSQL = "UPDATE " + postsTableName + " SET post_title=? WHERE ID=?";
+
       this.selectModPostsSQL = selectPostSQL + postsTableName +
               " WHERE post_modified > ? OR (post_modified=? AND ID > ?) ORDER BY post_modified ASC, ID ASC LIMIT ?";
 
@@ -1346,6 +1350,56 @@ public class DB implements MetricSet {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(updatePostContentSQL);
          stmt.setString(1, content);
+         stmt.setLong(2, postId);
+         return stmt.executeUpdate() > 0;
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt);
+      }
+   }
+
+   private final String updatePostExcerptSQL;
+
+   /**
+    * Updates the excerpt for a post.
+    * @param postId The post to update.
+    * @param excerpt The new excerpt.
+    * @return Was the post modified?
+    * @throws SQLException on database error or missing post id.
+    */
+   public boolean updatePostExcerpt(long postId, final String excerpt) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      Timer.Context ctx = metrics.updatePostTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(updatePostExcerptSQL);
+         stmt.setString(1, excerpt);
+         stmt.setLong(2, postId);
+         return stmt.executeUpdate() > 0;
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt);
+      }
+   }
+
+   private final String updatePostTitleSQL;
+
+   /**
+    * Updates the title for a post.
+    * @param postId The post to update.
+    * @param title The new title.
+    * @return Was the post modified?
+    * @throws SQLException on database error or missing post id.
+    */
+   public boolean updatePostTitle(long postId, final String title) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      Timer.Context ctx = metrics.updatePostTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(updatePostTitleSQL);
+         stmt.setString(1, title);
          stmt.setLong(2, postId);
          return stmt.executeUpdate() > 0;
       } finally {

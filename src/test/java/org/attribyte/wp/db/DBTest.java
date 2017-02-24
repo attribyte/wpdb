@@ -232,6 +232,35 @@ public class DBTest {
    }
 
    @Test
+   public void updatePostExcerpt() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      db().deletePost(1000);
+      Post testPost = createTestPost(createdUser, 1000);
+      db().insertPost(testPost, TimeZone.getDefault());
+      db().updatePostExcerpt(testPost.id, "this is the new excerpt");
+      Post.Builder insertedPost = db().selectPost(testPost.id);
+      assertNotNull(insertedPost);
+      assertEquals("this is the new excerpt", insertedPost.getExcerpt());
+   }
+
+   @Test
+   public void updatePostTitle() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      db().deletePost(1000);
+      Post testPost = createTestPost(createdUser, 1000);
+      db().insertPost(testPost, TimeZone.getDefault());
+      db().updatePostTitle(testPost.id, "this is the new title");
+      Post.Builder insertedPost = db().selectPost(testPost.id);
+      assertNotNull(insertedPost);
+      assertEquals("this is the new title", insertedPost.getTitle());
+   }
+
+
+   @Test
    public void updatePostStatus() throws Exception {
       String username = StringUtil.randomString(8);
       User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());

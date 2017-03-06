@@ -539,6 +539,24 @@ public class DBTest {
    }
 
    @Test
+   public void updatePostMetaValue() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      Post testPost0 = createTestPost(createdUser, -1);
+      db().insertPost(testPost0, TimeZone.getDefault());
+      String metaValue = StringUtil.randomString(8);
+      db().updatePostMetaValue(testPost0.id, "test_1234", metaValue);
+      Meta checkMeta = db().selectPostMetaValue(testPost0.id, "test_1234");
+      assertNotNull(checkMeta);
+      assertEquals(metaValue, checkMeta.value);
+      db().updatePostMetaValue(testPost0.id, "test_1234", metaValue + "x");
+      checkMeta = db().selectPostMetaValue(testPost0.id, "test_1234");
+      assertNotNull(checkMeta);
+      assertEquals(metaValue + "x", checkMeta.value);
+   }
+
+   @Test
    public void createTerm() throws Exception {
       String termName = StringUtil.randomString(8);
       Term term0 = db().createTerm(termName, "slug0-" + termName);

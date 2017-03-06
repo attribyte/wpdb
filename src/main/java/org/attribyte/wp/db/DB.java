@@ -213,7 +213,11 @@ public class DB implements MetricSet {
 
       this.selectPostMetaSQL = "SELECT meta_id, meta_key, meta_value FROM " + postMetaTableName + " WHERE post_id=?";
 
-      this.insertPostMetaSQL = "INSERT INTO " + postMetaTableName + "(post_id, meta_key, meta_value) VALUES (?,?,?)";
+      this.insertPostMetaSQL = "INSERT INTO " + postMetaTableName + " (post_id, meta_key, meta_value) VALUES (?,?,?)";
+
+      this.selectPostMetaValueSQL = "SELECT meta_id, meta_key, meta_value FROM " + postMetaTableName + " WHERE post_id=? AND meta_key=?";
+
+      this.updatePostMetaValueSQL = "UPDATE " + postMetaTableName + " SET meta_value=? WHERE meta_key=? AND post_id=?";
 
       this.deletePostMetaSQL = "DELETE FROM " + postMetaTableName + " WHERE post_id=?";
 
@@ -1672,6 +1676,80 @@ public class DB implements MetricSet {
       }
 
       return meta;
+   }
+
+   final String selectPostMetaValueSQL;
+
+   /**
+    * Selects a single post meta value.
+    * @param postId The post id.
+    * @param metaKey The key.
+    * @return The meta value or {@code null} if none.
+    * @throws SQLException on database error.
+    */
+   public Meta selectPostMetaValue(final long postId, final String metaKey) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+      Timer.Context ctx = metrics.selectPostMetaTimer.time();
+
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(selectPostMetaValueSQL);
+         stmt.setLong(1, postId);
+         stmt.setString(2, metaKey);
+         rs = stmt.executeQuery();
+         return rs.next() ? new Meta(rs.getLong(1), rs.getString(2), rs.getString(3)) : null;
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+   }
+
+
+   final String updatePostMetaValueSQL;
+
+   /**
+    * Updates a post meta value if it exists or inserts if it does not.
+    * @param postId The post id.
+    * @param metaKey The key.
+    * @param metaValue The value.
+    * @throws SQLException on database error.
+    */
+   public void updatePostMetaValue(final long postId, final String metaKey, final String metaValue) throws SQLException {
+
+      Meta currMeta = selectPostMetaValue(postId, metaKey);
+      if(currMeta == null) {
+         Connection conn = null;
+         PreparedStatement stmt = null;
+         Timer.Context ctx = metrics.setPostMetaTimer.time();
+         try {
+            conn = connectionSupplier.getConnection();
+            stmt = conn.prepareStatement(insertPostMetaSQL);
+            stmt.setLong(1, postId);
+            stmt.setString(2, metaKey);
+            stmt.setString(3, metaValue);
+            stmt.executeUpdate();
+         } finally {
+            ctx.stop();
+            SQLUtil.closeQuietly(conn, stmt);
+         }
+      } else {
+         Connection conn = null;
+         PreparedStatement stmt = null;
+         Timer.Context ctx = metrics.setPostMetaTimer.time();
+         try {
+            conn = connectionSupplier.getConnection();
+            stmt = conn.prepareStatement(updatePostMetaValueSQL);
+            stmt.setString(1, metaValue);
+            stmt.setString(2, metaKey);
+            stmt.setLong(3, postId);
+            stmt.executeUpdate();
+         } finally {
+            ctx.stop();
+            SQLUtil.closeQuietly(conn, stmt);
+         }
+      }
    }
 
    final String insertPostMetaSQL;

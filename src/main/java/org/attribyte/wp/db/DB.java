@@ -259,6 +259,8 @@ public class DB implements MetricSet {
 
       this.updatePostExcerptSQL = "UPDATE " + postsTableName + " SET post_excerpt=? WHERE ID=?";
 
+      this.updatePostAuthorSQL = "UPDATE " + postsTableName + " SET post_author=? WHERE ID=?";
+
       this.updatePostTitleSQL = "UPDATE " + postsTableName + " SET post_title=? WHERE ID=?";
 
       this.selectModPostsSQL = selectPostSQL + postsTableName +
@@ -1434,6 +1436,31 @@ public class DB implements MetricSet {
          SQLUtil.closeQuietly(conn, stmt);
       }
    }
+
+   private final String updatePostAuthorSQL;
+
+   /**
+    * Updates the author of a post.
+    * @param postId The post id.
+    * @param authorId The new author id.
+    * @return Was the author changed?
+    * @throws SQLException on database error.
+    */
+   public boolean updatePostAuthor(final long postId, final long authorId) throws SQLException {
+
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(updatePostAuthorSQL);
+         stmt.setLong(1, authorId);
+         stmt.setLong(2, postId);
+         return stmt.executeUpdate() > 0;
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt);
+      }
+   }
+
 
    private final String updatePostCommentStatusSQL;
 

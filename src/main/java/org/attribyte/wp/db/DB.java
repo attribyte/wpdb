@@ -2278,6 +2278,39 @@ public class DB implements MetricSet {
 
    private final String insertPostTermSQL;
 
+
+   /**
+    * Adds a term at the end of the current terms if it does not already exist.
+    * @param postId The post id.
+    * @param taxonomyTerm The taxonomy term to add.
+    * @return Was the term added?
+    * @throws SQLException on database error.
+    */
+   public boolean addPostTerm(final long postId, final TaxonomyTerm taxonomyTerm) throws SQLException {
+
+      List<TaxonomyTerm> currTerms = selectPostTerms(postId, taxonomyTerm.taxonomy);
+      for(TaxonomyTerm currTerm : currTerms) {
+         if(currTerm.term.name.equals(taxonomyTerm.term.name)) {
+            return false;
+         }
+      }
+
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      Timer.Context ctx = metrics.postTermsSetTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(insertPostTermSQL);
+         stmt.setLong(1, postId);
+         stmt.setLong(2, taxonomyTerm.id);
+         stmt.setInt(3, currTerms.size()); //Add at the last position...
+         return stmt.executeUpdate() > 0;
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt);
+      }
+   }
+
    /**
     * Sets terms associated with a post, replacing any existing terms with the specified taxonomy.
     * <p>

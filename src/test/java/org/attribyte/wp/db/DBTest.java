@@ -259,6 +259,19 @@ public class DBTest {
       assertEquals("this is the new title", insertedPost.getTitle());
    }
 
+   @Test
+   public void updatePostGuid() throws Exception {
+      String username = StringUtil.randomString(8);
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User createdUser = db().createUser(user, "XXXX");
+      db().deletePost(1000);
+      Post testPost = createTestPost(createdUser, 1000);
+      db().insertPost(testPost, TimeZone.getDefault());
+      db().updatePostGuid(testPost.id, "http://this_is_new.com");
+      Post.Builder insertedPost = db().selectPost(testPost.id);
+      assertNotNull(insertedPost);
+      assertEquals("http://this_is_new.com", insertedPost.getGUID());
+   }
 
    @Test
    public void updatePostStatus() throws Exception {

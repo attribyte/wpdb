@@ -263,6 +263,8 @@ public class DB implements MetricSet {
 
       this.updatePostTitleSQL = "UPDATE " + postsTableName + " SET post_title=? WHERE ID=?";
 
+      this.updatePostGuidSQL = "UPDATE " + postsTableName + " SET guid=? WHERE ID=?";
+
       this.selectModPostsSQL = selectPostSQL + postsTableName +
               " WHERE post_modified > ? OR (post_modified=? AND ID > ?) ORDER BY post_modified ASC, ID ASC LIMIT ?";
 
@@ -1406,6 +1408,31 @@ public class DB implements MetricSet {
          conn = connectionSupplier.getConnection();
          stmt = conn.prepareStatement(updatePostTitleSQL);
          stmt.setString(1, title);
+         stmt.setLong(2, postId);
+         return stmt.executeUpdate() > 0;
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt);
+      }
+   }
+
+   private final String updatePostGuidSQL;
+
+   /**
+    * Updates the guid for a post.
+    * @param postId The post to update.
+    * @param guid The new guid.
+    * @return Was the post modified?
+    * @throws SQLException on database error or missing post id.
+    */
+   public boolean updatePostGuid(long postId, final String guid) throws SQLException {
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      Timer.Context ctx = metrics.updatePostTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.prepareStatement(updatePostGuidSQL);
+         stmt.setString(1, guid);
          stmt.setLong(2, postId);
          return stmt.executeUpdate() > 0;
       } finally {

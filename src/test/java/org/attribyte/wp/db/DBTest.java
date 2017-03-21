@@ -778,6 +778,13 @@ public class DBTest {
       assertTrue(blogs.size() > 0);
    }
 
+   @Test
+   public void selectPostIds() throws Exception {
+      List<Long> ids = db().selectPostIds();
+      assertNotNull(ids);
+      assertTrue(ids.size() > 0);
+   }
+
    /**
     * Creates a test post for a user.
     * @param user The user.

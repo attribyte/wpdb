@@ -225,6 +225,8 @@ public class DB implements MetricSet {
 
       this.selectPostsBySlugSQL = selectPostSQL + this.postsTableName + " WHERE post_name=? ORDER BY ID DESC";
 
+      this.selectAllPostIdsSQL = "SELECT ID FROM " + this.postsTableName + " ORDER BY ID ASC";
+
       this.selectChildrenSQL = selectPostSQL + this.postsTableName + " WHERE post_parent=? ORDER BY ID ASC";
 
       this. deleteChildrenSQL = "DELETE FROM " + this.postsTableName + " WHERE post_parent=?";
@@ -1145,6 +1147,33 @@ public class DB implements MetricSet {
       sql.append(" LIMIT ?,?");
       return sql;
    }
+
+   private final String selectAllPostIdsSQL;
+
+   /**
+    * Selects a list of all post ids in ascending order.
+    * @return The list of ids.
+    * @throws SQLException on database error.
+    */
+   public List<Long> selectPostIds() throws SQLException {
+      List<Long> ids = Lists.newArrayListWithExpectedSize(4096);
+      Connection conn = null;
+      Statement stmt = null;
+      ResultSet rs = null;
+
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.createStatement();
+         rs = stmt.executeQuery(selectAllPostIdsSQL);
+         while(rs.next()) {
+            ids.add(rs.getLong(1));
+         }
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+      return ids;
+   }
+
 
    private final String selectPostsBySlugSQL;
 

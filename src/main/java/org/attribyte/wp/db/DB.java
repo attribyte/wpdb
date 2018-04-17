@@ -287,7 +287,7 @@ public class DB implements MetricSet {
    /**
     * Creates a user.
     * <p>
-    *    If the {@code id} is > 0, the user will be created with this id, otherwise it
+    *    If the {@code id} is &gt; 0, the user will be created with this id, otherwise it
     *    will be auto-generated.
     * </p>
     * @param user The user.

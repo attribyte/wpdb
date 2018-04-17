@@ -35,6 +35,7 @@ public class ImageAttachment extends Post {
     * @param parent The parent post.
     * @param path The image path.
     * @param slug The image slug.
+    * @param caption The image caption.
     * @param mimeType The associated mime type.
     */
    public ImageAttachment(final Post parent, final String path, final String slug,

@@ -27,6 +27,56 @@ import static org.attribyte.wp.Util.slugify;
 public class User {
 
    /**
+    * Constants for typical user metadata keys.
+    */
+   public static class MetaKeys {
+      /**
+       * A nickname {@value}.
+       */
+      public static final String NICKNAME = "nickname";
+
+      /**
+       * A first name {@value}.
+       */
+      public static final String FIRST_NAME = "first_name";
+
+      /**
+       * A last name {@value}.
+       */
+      public static final String LAST_NAME = "last_name";
+
+      /**
+       * A description {@value}.
+       */
+      public static final String DESCRIPTION = "description";
+
+      /**
+       * The capabilities (serialized PHP) {@value}.
+       */
+      public static final String CAPABILITIES = "wp_capabilities";
+
+      /**
+       * The user level {@value}.
+       */
+      public static final String USER_LEVEL = "wp_user_level";
+
+      /**
+       * The source domain {@value}.
+       */
+      public static final String SOURCE_DOMAIN = "source_domain";
+
+      /**
+       * The primary blog {@value}.
+       */
+      public static final String PRIMARY_BLOG = "primary_blog";
+
+      /**
+       * The locale {@value}.
+       */
+      public static final String LOCALE = "locale";
+   }
+
+   /**
     * Creates a user with a slug.
     * @param id The unique id.
     * @param username The username.

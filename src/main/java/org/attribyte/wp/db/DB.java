@@ -617,6 +617,9 @@ public class DB implements MetricSet {
          rs = stmt.executeQuery();
          if(rs.next()) {
             long umetaId = rs.getLong(1);
+            SQLUtil.closeQuietly(stmt, rs);
+            stmt = null;
+            rs = null;
             stmt = conn.prepareStatement(updateUserMetaSQL);
             stmt.setString(1, value);
             stmt.setLong(2, umetaId);

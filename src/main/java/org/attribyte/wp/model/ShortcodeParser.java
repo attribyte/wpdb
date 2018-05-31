@@ -306,7 +306,7 @@ public class ShortcodeParser {
       START_ENCLOSING,
       CONTENT,
       START_END,
-      END_NAME;
+      END_NAME
    }
 
    /**

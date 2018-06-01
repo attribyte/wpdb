@@ -63,7 +63,7 @@ public class DBTest {
    @Test
    public void createUser() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       assertNotNull(createdUser);
       assertTrue(createdUser.id > 0L);
@@ -72,7 +72,7 @@ public class DBTest {
    @Test
    public void deleteUser() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       assertNotNull(createdUser);
       assertTrue(createdUser.id > 0L);
@@ -85,7 +85,7 @@ public class DBTest {
    public void createUserWithId() throws Exception {
       db().deleteUser(14L);
       String username = StringUtil.randomString(8);
-      User user = new User(14L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(14L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       db().createUser(user, "XXXX");
       User createdUser = db().resolveUser(14L);
       assertNotNull(createdUser);
@@ -95,7 +95,7 @@ public class DBTest {
    @Test
    public void userById() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       user = db().selectUser(createdUser.id);
       assertNotNull(user);
@@ -106,7 +106,7 @@ public class DBTest {
    @Test
    public void userByUsername() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "test-slug", username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "test-slug", username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       user = db().selectUser(createdUser.username);
       assertNotNull(user);
@@ -117,7 +117,7 @@ public class DBTest {
    @Test
    public void findUser() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "test-slug", username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "test-slug", username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       user = db().findUser(createdUser.slug);
       assertNotNull(user);
@@ -128,7 +128,7 @@ public class DBTest {
    @Test
    public void userMetadata() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       assertNotNull(createdUser);
       assertTrue(createdUser.id > 0L);
@@ -153,7 +153,7 @@ public class DBTest {
    @Test
    public void insertPost() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       Post testPost = createTestPost(createdUser, 1000).withId(0L);
       Post createdPost = db().insertPost(testPost, TimeZone.getDefault());
@@ -167,7 +167,7 @@ public class DBTest {
    @Test
    public void insertPostWithId() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       db().deletePost(1000);
       Post testPost = createTestPost(createdUser, 1000);
@@ -179,7 +179,7 @@ public class DBTest {
    @Test
    public void updatePost() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       db().deletePost(1000);
       Post testPost = createTestPost(createdUser, 1000);
@@ -200,7 +200,7 @@ public class DBTest {
    @Test
    public void updatePostTimestamps() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       db().deletePost(1000);
       Post testPost = createTestPost(createdUser, 1000);
@@ -220,7 +220,7 @@ public class DBTest {
    @Test
    public void updatePostContent() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       db().deletePost(1000);
       Post testPost = createTestPost(createdUser, 1000);
@@ -234,7 +234,7 @@ public class DBTest {
    @Test
    public void updatePostExcerpt() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       db().deletePost(1000);
       Post testPost = createTestPost(createdUser, 1000);
@@ -248,7 +248,7 @@ public class DBTest {
    @Test
    public void updatePostTitle() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       db().deletePost(1000);
       Post testPost = createTestPost(createdUser, 1000);
@@ -262,7 +262,7 @@ public class DBTest {
    @Test
    public void updatePostGuid() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       db().deletePost(1000);
       Post testPost = createTestPost(createdUser, 1000);
@@ -276,7 +276,7 @@ public class DBTest {
    @Test
    public void updatePostStatus() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       db().deletePost(1000);
       Post testPost = createTestPost(createdUser, 1000);
@@ -289,7 +289,7 @@ public class DBTest {
    @Test
    public void updatePostAuthor() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       db().deletePost(1000);
       Post testPost = createTestPost(createdUser, 1000);
@@ -297,7 +297,7 @@ public class DBTest {
       Post.Builder insertedPost = db().selectPost(testPost.id);
       assertNotNull(insertedPost);
       username = StringUtil.randomString(8);
-      user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       createdUser = db().createUser(user, "XXXX");
       db().updatePostAuthor(insertedPost.getId(), createdUser.id);
       insertedPost = db().selectPost(testPost.id);
@@ -307,7 +307,7 @@ public class DBTest {
    @Test
    public void parentChild() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       Post testParent = createTestPost(createdUser, -1);
       db().insertPost(testParent, TimeZone.getDefault());
@@ -329,7 +329,7 @@ public class DBTest {
    @Test
    public void idSelectWithTerms() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       Post testPost0 = createTestPost(createdUser, -1);
       db().insertPost(testPost0, TimeZone.getDefault());
@@ -359,7 +359,7 @@ public class DBTest {
    @Test
    public void idSelectMultiTypeWithTerms() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       Post testPost0 = createTestPost(createdUser, -1);
       db().insertPost(testPost0, TimeZone.getDefault());
@@ -372,7 +372,7 @@ public class DBTest {
    @Test
    public void mapSelect() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       Post testPost0 = createTestPost(createdUser, -1);
       db().insertPost(testPost0, TimeZone.getDefault());
@@ -394,7 +394,7 @@ public class DBTest {
    @Test
    public void resolvePost() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       db().deletePost(1001);
       Post testPost = createTestPost(createdUser, 1001);
@@ -426,7 +426,7 @@ public class DBTest {
    @Test
    public void postSlug() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       Post testPost0 = createTestPost(createdUser, -1);
       db().insertPost(testPost0, TimeZone.getDefault());
@@ -439,7 +439,7 @@ public class DBTest {
    @Test
    public void postPaging() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       Post testPost0 = createTestPost(createdUser, -1);
       Post testPost1 = createTestPost(createdUser, -1);
@@ -464,7 +464,7 @@ public class DBTest {
    @Test
    public void postMultiType() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       Post testPost0 = createTestPost(createdUser, -1);
       Post testPost1 = createTestPost(createdUser, -1);
@@ -479,7 +479,7 @@ public class DBTest {
    @Test
    public void modPosts() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       db().deletePost(1000L);
       db().deletePost(1001L);
@@ -498,7 +498,7 @@ public class DBTest {
    @Test
    public void modPostsWithType() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       db().deletePost(1000L);
       db().deletePost(1001L);
@@ -514,7 +514,7 @@ public class DBTest {
    @Test
    public void modPostsMultiType() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       db().deletePost(1000L);
       db().deletePost(1001L);
@@ -530,7 +530,7 @@ public class DBTest {
    @Test
    public void postPagingInterval() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       Post testPost0 = createTestPost(createdUser, -1);
       Post testPost1 = createTestPost(createdUser, -1);
@@ -550,7 +550,7 @@ public class DBTest {
    @Test
    public void authorPosts() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       Post testPost0 = createTestPost(createdUser, -1);
       Post testPost1 = createTestPost(createdUser, -1);
@@ -572,7 +572,7 @@ public class DBTest {
    @Test
    public void updatePostMetaValue() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       Post testPost0 = createTestPost(createdUser, -1);
       db().insertPost(testPost0, TimeZone.getDefault());
@@ -701,7 +701,7 @@ public class DBTest {
    @Test
    public void postTerms() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       db().deletePost(1002);
       Post testPost = createTestPost(createdUser, 1002);
@@ -721,7 +721,7 @@ public class DBTest {
    @Test
    public void addPostTerm() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       db().deletePost(1002);
       Post testPost = createTestPost(createdUser, 1002);
@@ -742,7 +742,7 @@ public class DBTest {
    @Test
    public void postTermsCache() throws Exception {
       String username = StringUtil.randomString(8);
-      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), ImmutableList.of());
+      User user = new User(0L, username, username.toUpperCase(), username + "@testy.com", System.currentTimeMillis(), "https://test.com", ImmutableList.of());
       User createdUser = db().createUser(user, "XXXX");
       db().deletePost(1003);
       Post testPost = createTestPost(createdUser, 1003);

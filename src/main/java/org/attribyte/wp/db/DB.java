@@ -277,12 +277,12 @@ public class DB implements MetricSet {
    }
 
    private static final String createUserSQL =
-           "INSERT INTO wp_users (user_login, user_pass, user_nicename, display_name, user_email, user_registered) " +
-                   "VALUES (?, ?, ?, ?, ?, NOW())";
+           "INSERT INTO wp_users (user_login, user_pass, user_nicename, display_name, user_email, user_registered, user_url) " +
+                   "VALUES (?, ?, ?, ?, ?, NOW(), ?)";
 
    private static final String createUserWithIdSQL =
-           "INSERT INTO wp_users (ID, user_login, user_pass, user_nicename, display_name, user_email, user_registered) " +
-                   "VALUES (?, ?, ?, ?, ?, ?, NOW())";
+           "INSERT INTO wp_users (ID, user_login, user_pass, user_nicename, display_name, user_email, user_registered, user_url) " +
+                   "VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)";
 
    /**
     * Creates a user.
@@ -319,6 +319,7 @@ public class DB implements MetricSet {
             stmt.setString(4, nicename);
             stmt.setString(5, user.displayName());
             stmt.setString(6, Strings.nullToEmpty(user.email));
+            stmt.setString(7, Strings.nullToEmpty(user.url));
             stmt.executeUpdate();
             return user;
          } else {
@@ -328,6 +329,7 @@ public class DB implements MetricSet {
             stmt.setString(3, nicename);
             stmt.setString(4, user.displayName());
             stmt.setString(5, Strings.nullToEmpty(user.email));
+            stmt.setString(6, Strings.nullToEmpty(user.url));
             stmt.executeUpdate();
             rs = stmt.getGeneratedKeys();
             if(rs.next()) {
@@ -343,7 +345,7 @@ public class DB implements MetricSet {
       }
    }
 
-   private static final String selectUserSQL = "SELECT ID, user_login, user_nicename, display_name, user_email, user_registered FROM wp_users";
+   private static final String selectUserSQL = "SELECT ID, user_login, user_nicename, display_name, user_email, user_registered, user_url FROM wp_users";
 
    /**
     * Creates a user from a result set.
@@ -355,7 +357,7 @@ public class DB implements MetricSet {
       String niceName = Strings.nullToEmpty(rs.getString(3)).trim();
       String displayName = Strings.nullToEmpty(rs.getString(4)).trim();
       String useDisplayName = displayName.isEmpty() ? niceName : displayName;
-      return new User(rs.getLong(1), rs.getString(2), useDisplayName, niceName, rs.getString(5), rs.getTimestamp(6).getTime(), ImmutableList.of());
+      return new User(rs.getLong(1), rs.getString(2), useDisplayName, niceName, rs.getString(5), rs.getTimestamp(6).getTime(), rs.getString(7), ImmutableList.of());
    }
 
    private static final String selectUserByUsernameSQL = selectUserSQL + " WHERE user_login=?";

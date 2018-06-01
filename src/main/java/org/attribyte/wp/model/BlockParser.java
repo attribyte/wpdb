@@ -14,15 +14,38 @@
 
 package org.attribyte.wp.model;
 
+import com.google.common.base.CharMatcher;
+import com.google.common.base.Charsets;
+import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+import com.google.common.io.Files;
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Comment;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.jsoup.nodes.Node;
+import org.jsoup.nodes.TextNode;
+import org.jsoup.select.NodeVisitor;
 
+import java.io.File;
 import java.text.ParseException;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class BlockParser {
+
+   public static void main(String[] args) throws Exception {
+      String content = new String(Files.toByteArray(new File("/home/user/test.wp")), Charsets.UTF_8);
+      List<Block> blocks = parse(content, "");
+      for(Block block : blocks) {
+         System.out.println(block.toString());
+      }
+   }
 
    /**
     * Parses content as a sequence of blocks.
@@ -32,14 +55,51 @@ public class BlockParser {
     */
    public static List<Block> parse(final String content, final String baseUri) throws ParseException {
       Document doc = Jsoup.parseBodyFragment(content, baseUri);
+      List<Node> blockMarkers = Lists.newArrayList();
+      doc.body().traverse(new NodeVisitor() {
+         @Override
+         public void head(final Node node, final int i) {
+            if(node instanceof Comment) {
+               String comment = Strings.nullToEmpty(((Comment)node).getData()).trim();
+               if(comment.startsWith("wp:") || comment.startsWith("/wp:")) {
+                  blockMarkers.add(node);
+               }
+            }
+         }
+
+         @Override
+         public void tail(final Node node, final int i) {
+
+         }
+      });
+
+      //Parse/tidy of invalid markup may leave markers as children
+      //of nested elements. Move them to the body...
+
+      for(int i = 0; i < blockMarkers.size(); i++) {
+         Node node = blockMarkers.get(i);
+         if(node.parent() != doc.body()) {
+            Node cloneNode = node.clone();
+            node.remove();
+            if(i == 0) {
+               doc.body().prependChild(cloneNode);
+            } else {
+               blockMarkers.get(i-1).after(cloneNode);
+            }
+            blockMarkers.set(i, cloneNode);
+         }
+      }
+
+      Set<Node> markerSet = Sets.newIdentityHashSet();
+      markerSet.addAll(blockMarkers);
 
       List<Block> blocks = Lists.newArrayList();
       Block currBlock = null;
       List<Node> currNodes = Lists.newArrayList();
 
       for(Node node : doc.body().childNodes()) {
-         if(node.nodeName().equals("#comment")) {
-            String comment = commentContent(node);
+         if(markerSet.contains(node)) {
+            String comment = ((Comment)node).getData().trim();
             if(comment.startsWith("wp:")) {
                if(!currNodes.isEmpty()) {
                   //Default block...
@@ -75,9 +135,57 @@ public class BlockParser {
          blocks.add(new Block("html", currNodes));
       }
 
-      return blocks;
+      return removeEmptyBlocks(blocks);
    }
 
+   /**
+    * Removes empty blocks from a collection of blocks.
+    * @param blocks The collection of blocks.
+    * @return A list of blocks with empty blocks removed.
+    */
+   public static List<Block> removeEmptyBlocks(final Collection<Block> blocks) {
+      List<Block> cleanBlocks = Lists.newArrayListWithExpectedSize(blocks.size());
+      for(Block block : blocks) {
+         if(block.content.isEmpty()) {
+            continue;
+         }
+
+         if(isWhitespace(block.content)) {
+            continue;
+         }
+
+         cleanBlocks.add(block);
+      }
+      return cleanBlocks;
+   }
+
+   /**
+    * @param nodes A collection of nodes.
+    * @return Are all nodes whitespace-only?
+    */
+   private static boolean isWhitespace(final Collection<Node> nodes) {
+      for(Node node : nodes) {
+         if(!isWhitespace(node)) {
+            return false;
+         }
+      }
+      return true;
+   }
+
+   /**
+    * @param node A node.
+    * @return Is the node whitespace-only?
+    */
+   private static boolean isWhitespace(final Node node) {
+      if(node instanceof TextNode) {
+         return CharMatcher.whitespace().matchesAllOf(((TextNode)node).text());
+      } else if(node instanceof Element) {
+         boolean hasAttributes = node.attributes().size() > 0;
+         return CharMatcher.whitespace().matchesAllOf(((Element)node).text()) && !hasAttributes;
+      } else {
+         return false;
+      }
+   }
 
    /**
     * Creates an empty block from a comment string.
@@ -94,21 +202,4 @@ public class BlockParser {
          return new Block(comment.substring(nameStart).trim());
       }
    }
-
-   /**
-    * Gets the content of a comment node.
-    * @param comment The comment node.
-    * @return The content.
-    */
-   private static String commentContent(final Node comment) {
-      String content = comment.toString().trim();
-      if(content.startsWith("<!--")) {
-         content = content.substring(4);
-      }
-      if(content.endsWith("-->")) {
-         content = content.substring(0, content.lastIndexOf("-->"));
-      }
-      return content.trim();
-   }
-
 }

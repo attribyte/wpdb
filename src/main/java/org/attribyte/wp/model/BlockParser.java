@@ -38,6 +38,7 @@ public class BlockParser {
     * @param content The content to parse.
     * @param baseUri The base URI for content.
     * @return The sequence of blocks.
+    * @throws ParseException on invalid block format.
     */
    public static List<Block> parse(final String content, final String baseUri) throws ParseException {
       Document doc = Jsoup.parseBodyFragment(content, baseUri);

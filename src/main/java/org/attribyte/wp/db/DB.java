@@ -273,6 +273,12 @@ public class DB implements MetricSet {
       this.selectModPostsWithTypeSQL = selectPostSQL + postsTableName +
               " WHERE (post_modified > ? OR (post_modified=? AND ID > ?)) %s ORDER BY post_modified ASC, ID ASC LIMIT ?";
 
+      this.selectPostsAfterIdSQL = selectPostSQL + postsTableName +
+              " WHERE ID > ? ORDER BY ID ASC LIMIT ?";
+
+      this.selectPostsAfterIdWithTypeSQL = selectPostSQL + postsTableName +
+              " WHERE ID > ? %s ORDER BY ID ASC LIMIT ?";
+
       this.metrics = metrics;
    }
 
@@ -822,6 +828,79 @@ public class DB implements MetricSet {
          stmt.setTimestamp(2, ts);
          stmt.setLong(3, startId);
          stmt.setInt(4, limit);
+
+         rs = stmt.executeQuery();
+         while(rs.next()) {
+            builders.add(postFromResultSet(rs));
+         }
+      } finally {
+         ctx.stop();
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+
+      List<Post> posts = Lists.newArrayListWithExpectedSize(builders.size());
+      for(Post.Builder builder : builders) {
+         if(withResolve) {
+            posts.add(resolve(builder).build());
+         } else {
+            posts.add(builder.build());
+         }
+      }
+
+      return posts;
+   }
+
+   private final String selectPostsAfterIdSQL;
+   private final String selectPostsAfterIdWithTypeSQL;
+
+
+   /**
+    * Selects posts after a specified id in ascending order.
+    * @param type The post type. May be {@code null} for all types.
+    * @param afterId Posts after this id will be selected..
+    * @param limit The maximum number of posts returned.
+    * @param withResolve Should associated users, etc be resolved?
+    * @return The list of posts.
+    * @throws SQLException on database error.
+    */
+   public List<Post> selectPostsAfterId(final Post.Type type,
+                                        final long afterId,
+                                        final int limit,
+                                        final boolean withResolve) throws SQLException {
+      return selectPostsAfterId(type != null ? EnumSet.of(type) : null, afterId, limit, withResolve);
+   }
+
+
+   /**
+    * Selects posts after a specified id in ascending order.
+    * @param types The set of post type. May be {@code null} or empty for all types.
+    * @param afterId Posts after this id will be selected..
+    * @param limit The maximum number of posts returned.
+    * @param withResolve Should associated users, etc be resolved?
+    * @return The list of posts.
+    * @throws SQLException on database error.
+    */
+   public List<Post> selectPostsAfterId(final EnumSet<Post.Type> types,
+                                        final long afterId,
+                                        final int limit,
+                                        final boolean withResolve) throws SQLException {
+
+      List<Post.Builder> builders = Lists.newArrayListWithExpectedSize(limit < 1024 ? limit : 1024);
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
+      Timer.Context ctx = metrics.selectModPostsTimer.time();
+      try {
+         conn = connectionSupplier.getConnection();
+
+         if(types == null || types.size() == 0) {
+            stmt = conn.prepareStatement(selectPostsAfterIdSQL);
+         } else {
+            stmt = conn.prepareStatement(String.format(selectPostsAfterIdWithTypeSQL, appendPostTypes(types, new StringBuilder()).toString()));
+         }
+
+         stmt.setLong(1, afterId);
+         stmt.setInt(2, limit);
 
          rs = stmt.executeQuery();
          while(rs.next()) {

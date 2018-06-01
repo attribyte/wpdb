@@ -273,6 +273,8 @@ public class DB implements MetricSet {
       this.selectModPostsWithTypeSQL = selectPostSQL + postsTableName +
               " WHERE (post_modified > ? OR (post_modified=? AND ID > ?)) %s ORDER BY post_modified ASC, ID ASC LIMIT ?";
 
+      this.selectMaxPostIdSQL = "SELECT MAX(ID) FROM " + postsTableName;
+
       this.selectPostsAfterIdSQL = selectPostSQL + postsTableName +
               " WHERE ID > ? ORDER BY ID ASC LIMIT ?";
 
@@ -852,7 +854,26 @@ public class DB implements MetricSet {
 
    private final String selectPostsAfterIdSQL;
    private final String selectPostsAfterIdWithTypeSQL;
+   private final String selectMaxPostIdSQL;
 
+   /**
+    * Selects the current maximum post id.
+    * @return The post id.
+    * @throws SQLException on database error.
+    */
+   public long selectMaxPostId() throws SQLException {
+      Connection conn = null;
+      Statement stmt = null;
+      ResultSet rs = null;
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.createStatement();
+         rs = stmt.executeQuery(selectMaxPostIdSQL);
+         return rs.next() ? rs.getLong(1) : 0L;
+      } finally {
+         closeQuietly(conn, stmt, rs);
+      }
+   }
 
    /**
     * Selects posts after a specified id in ascending order.

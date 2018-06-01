@@ -17,8 +17,6 @@ package org.attribyte.wp.model;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Charsets;
 import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.io.Files;
@@ -33,19 +31,10 @@ import org.jsoup.select.NodeVisitor;
 import java.io.File;
 import java.text.ParseException;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 public class BlockParser {
-
-   public static void main(String[] args) throws Exception {
-      String content = new String(Files.toByteArray(new File("/home/user/test.wp")), Charsets.UTF_8);
-      List<Block> blocks = parse(content, "");
-      for(Block block : blocks) {
-         System.out.println(block.toString());
-      }
-   }
 
    /**
     * Parses content as a sequence of blocks.

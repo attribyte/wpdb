@@ -143,7 +143,7 @@ public class Site {
       final String authorSlug = post.author != null ? Strings.nullToEmpty(post.author.slug) : "";
       final List<TaxonomyTerm> categories = post.categories();
       final Term categoryTerm = categories.size() > 0 ? categories.get(0).term : defaultCategory;
-      final String category = categoryTerm != null ? categoryTerm.slug : "";
+      final String category = Strings.nullToEmpty(categoryTerm.slug);
       final String post_id = Long.toString(post.id);
       final DateTime publishTime = new DateTime(post.publishTimestamp);
       final String year = Integer.toString(publishTime.getYear());
@@ -160,7 +160,7 @@ public class Site {
               .replace("%minute%", minute)
               .replace("%second%", second)
               .replace("%post_id%", post_id)
-              .replace("%postname%", post.slug)
+              .replace("%postname%", Strings.nullToEmpty(post.slug))
               .replace("%category%", category)
               .replace("%author%", authorSlug);
       return baseURL + path;

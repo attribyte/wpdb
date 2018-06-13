@@ -835,7 +835,7 @@ public class Post {
    public final int commentCount;
 
    /**
-    * Metadata associated with the user.
+    * Metadata associated with the post.
     */
    public final ImmutableList<Meta> metadata;
 

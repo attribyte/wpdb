@@ -14,6 +14,7 @@
 
 package org.attribyte.wp.model;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
 import org.joda.time.DateTime;
 
@@ -77,6 +78,18 @@ public class Site {
               other.permalinkStructure != null ? other.permalinkStructure : this.permalinkStructure,
               other.defaultCategory != null ? other.defaultCategory : this.defaultCategory
       );
+   }
+
+   @Override
+   public String toString() {
+      return MoreObjects.toStringHelper(this)
+              .add("id", id)
+              .add("baseURL", baseURL)
+              .add("title", title)
+              .add("description", description)
+              .add("permalinkStructure", permalinkStructure)
+              .add("defaultCategory", defaultCategory)
+              .toString();
    }
 
    /**

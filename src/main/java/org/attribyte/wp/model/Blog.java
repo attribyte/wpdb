@@ -14,6 +14,8 @@
 
 package org.attribyte.wp.model;
 
+import com.google.common.base.MoreObjects;
+
 /**
  * An immutable blog.
  */
@@ -36,6 +38,18 @@ public class Blog {
       this.path = path;
       this.registeredTimestamp = registeredTimestamp;
       this.updatedTimestamp = updatedTimestamp;
+   }
+
+   @Override
+   public String toString() {
+      return MoreObjects.toStringHelper(this)
+              .add("id", id)
+              .add("siteId", siteId)
+              .add("domain", domain)
+              .add("path", path)
+              .add("registeredTimestamp", registeredTimestamp)
+              .add("updatedTimestamp", updatedTimestamp)
+              .toString();
    }
 
    /**

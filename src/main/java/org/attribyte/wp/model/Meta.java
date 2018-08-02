@@ -14,6 +14,8 @@
 
 package org.attribyte.wp.model;
 
+import com.google.common.base.MoreObjects;
+
 /**
  * Metadata associated with a post, user, or
  * other object.
@@ -39,6 +41,15 @@ public class Meta {
       this.id = id;
       this.key = key;
       this.value = value;
+   }
+
+   @Override
+   public String toString() {
+      return MoreObjects.toStringHelper(this)
+              .add("id", id)
+              .add("key", key)
+              .add("value", value)
+              .toString();
    }
 
    /**

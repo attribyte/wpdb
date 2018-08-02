@@ -13,6 +13,7 @@
  */
 
 package org.attribyte.wp.model;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 
@@ -145,6 +146,20 @@ public class User {
     */
    public User withMetadata(final List<Meta> metadata) {
       return new User(id, username, displayName, slug, email, createTimestamp, url, metadata);
+   }
+
+   @Override
+   public String toString() {
+      return MoreObjects.toStringHelper(this)
+              .add("id", id)
+              .add("username", username)
+              .add("displayName", displayName)
+              .add("email", email)
+              .add("url", url)
+              .add("createTimestamp", createTimestamp)
+              .add("slug", slug)
+              .add("metadata", metadata)
+              .toString();
    }
 
    /**

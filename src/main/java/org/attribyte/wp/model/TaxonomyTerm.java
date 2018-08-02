@@ -14,6 +14,8 @@
 
 package org.attribyte.wp.model;
 
+import com.google.common.base.MoreObjects;
+
 /**
  * A term as referenced in a taxonomy.
  */
@@ -48,6 +50,17 @@ public class TaxonomyTerm {
       this.term = term;
       this.description = description;
       this.parentId = parentId;
+   }
+
+   @Override
+   public String toString() {
+      return MoreObjects.toStringHelper(this)
+              .add("id", id)
+              .add("taxonomy", taxonomy)
+              .add("term", term)
+              .add("description", description)
+              .add("parentId", parentId)
+              .toString();
    }
 
    /**

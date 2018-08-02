@@ -14,6 +14,7 @@
 
 package org.attribyte.wp.model;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -767,6 +768,30 @@ public class Post {
               publishTimestamp, modifiedTimestamp, status, parentId,
               guid, commentCount, this.metadata, type, mimeType, taxonomyTerms,
               children != null ? ImmutableList.copyOf(children) : ImmutableList.of());
+   }
+
+   @Override
+   public String toString() {
+      return MoreObjects.toStringHelper(this)
+              .add("id", id)
+              .add("slug", slug)
+              .add("title", title)
+              .add("excerpt", excerpt)
+              .add("content", content)
+              .add("authorId", authorId)
+              .add("author", author)
+              .add("publishTimestamp", publishTimestamp)
+              .add("modifiedTimestamp", modifiedTimestamp)
+              .add("status", status)
+              .add("parentId", parentId)
+              .add("guid", guid)
+              .add("commentCount", commentCount)
+              .add("metadata", metadata)
+              .add("type", type)
+              .add("mimeType", mimeType)
+              .add("taxonomyTerms", taxonomyTerms)
+              .add("children", children)
+              .toString();
    }
 
    /**

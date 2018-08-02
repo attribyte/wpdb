@@ -227,6 +227,8 @@ public class DB implements MetricSet {
 
       this.selectAllPostIdsSQL = "SELECT ID FROM " + this.postsTableName + " ORDER BY ID ASC";
 
+      this.selectAllPostIdsTypeSQL = "SELECT ID FROM " + this.postsTableName + " WHERE post_type IN (%s) ORDER BY ID ASC";
+
       this.selectChildrenSQL = selectPostSQL + this.postsTableName + " WHERE post_parent=? ORDER BY ID ASC";
 
       this. deleteChildrenSQL = "DELETE FROM " + this.postsTableName + " WHERE post_parent=?";
@@ -1279,6 +1281,38 @@ public class DB implements MetricSet {
       return ids;
    }
 
+   private final String selectAllPostIdsTypeSQL;
+
+   /**
+    * Selects a list of all post ids in ascending order.
+    * @return The list of ids.
+    * @throws SQLException on database error.
+    */
+   public List<Long> selectPostIds(EnumSet<Post.Type> types) throws SQLException {
+
+      if(types == null || types.isEmpty()) {
+         return selectPostIds();
+      }
+
+      List<Long> ids = Lists.newArrayListWithExpectedSize(4096);
+      Connection conn = null;
+      Statement stmt = null;
+      ResultSet rs = null;
+
+      String typesIn = inJoiner.join(types.stream().map(t -> String.format("'%s'", t.toString())).collect(Collectors.toSet()));
+
+      try {
+         conn = connectionSupplier.getConnection();
+         stmt = conn.createStatement();
+         rs = stmt.executeQuery(String.format(selectAllPostIdsTypeSQL, typesIn));
+         while(rs.next()) {
+            ids.add(rs.getLong(1));
+         }
+      } finally {
+         SQLUtil.closeQuietly(conn, stmt, rs);
+      }
+      return ids;
+   }
 
    private final String selectPostsBySlugSQL;
 

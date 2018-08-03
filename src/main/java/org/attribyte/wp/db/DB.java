@@ -185,6 +185,8 @@ public class DB implements MetricSet {
 
       this.selectTermIdSQL = "SELECT name, slug FROM " + termsTableName + " WHERE term_id=?";
 
+      this.selectTermSlugSQL = "SELECT id, name, slug FROM " + termsTableName + " WHERE slug=?";
+
       this.selectTermIdsSQL = "SELECT term_id FROM " + termsTableName + " WHERE name=?";
 
       this.selectTaxonomyTermSQL = "SELECT term_taxonomy_id," + termTaxonomyTableName + ".term_id, description " +
@@ -2184,6 +2186,29 @@ public class DB implements MetricSet {
       } finally {
          ctx.stop();
          closeQuietly(conn, stmt, rs);
+      }
+   }
+
+   private final String selectTermSlugSQL;
+
+   /**
+    * Selects terms with a matching slug.
+    * @param slug The slug.
+    * @return The terms or an empty list if none.
+    * @throws SQLException on database error.
+    */
+   public List<Term> selectSlugTerms(final String slug) throws SQLException {
+      try(Connection conn = connectionSupplier.getConnection();
+          PreparedStatement stmt = conn.prepareStatement(selectTermSlugSQL);
+          Timer.Context ctx = metrics.selectTermTimer.time()) {
+         stmt.setString(1, slug);
+         try(ResultSet rs = stmt.executeQuery()) {
+            List<Term> terms = Lists.newArrayListWithExpectedSize(2);
+            while(rs.next()) {
+               terms.add(new Term(rs.getLong(1), rs.getString(2), rs.getString(3)));
+            }
+            return terms;
+         }
       }
    }
 

@@ -185,6 +185,8 @@ public class DB implements MetricSet {
 
       this.selectTermIdSQL = "SELECT name, slug FROM " + termsTableName + " WHERE term_id=?";
 
+      this.deleteTermIdSQL = "DELETE FROM " + termsTableName + " WHERE term_id=?";
+
       this.selectTermSlugSQL = "SELECT id, name, slug FROM " + termsTableName + " WHERE slug=?";
 
       this.selectTermIdsSQL = "SELECT term_id FROM " + termsTableName + " WHERE name=?";
@@ -2186,6 +2188,22 @@ public class DB implements MetricSet {
       } finally {
          ctx.stop();
          closeQuietly(conn, stmt, rs);
+      }
+   }
+
+   private final String deleteTermIdSQL;
+
+   /**
+    * Deletes a term by id.
+    * @param id The id.
+    * @return Was the term deleted?
+    * @throws SQLException on database error.
+    */
+   public boolean deleteTerm(final long id) throws SQLException {
+      try(Connection conn = connectionSupplier.getConnection();
+          PreparedStatement stmt = conn.prepareStatement(deleteTermIdSQL)) {
+         stmt.setLong(1, id);
+         return stmt.executeUpdate() > 0;
       }
    }
 

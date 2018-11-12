@@ -1701,7 +1701,9 @@ public class DB implements MetricSet {
          throw new SQLException("The post id must be specified for update");
       }
 
-      post = post.modifiedNow();
+      if(post.modifiedTimestamp < 1) {
+         post = post.modifiedNow();
+      }
 
       int offset = tz.getOffset(post.publishTimestamp);
       Connection conn = null;

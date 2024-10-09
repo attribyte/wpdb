@@ -2116,22 +2116,17 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public Set<Long> selectTermIds(final String name) throws SQLException {
-
-      Connection conn = null;
-      PreparedStatement stmt = null;
-      ResultSet rs = null;
       Set<Long> ids = Sets.newHashSetWithExpectedSize(4);
-      try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(selectTermIdsSQL);
+      try(
+         Connection conn = connectionSupplier.getConnection();
+         PreparedStatement stmt = conn.prepareStatement(selectTermIdsSQL)) {
          stmt.setString(1, name);
-         rs = stmt.executeQuery();
-         while(rs.next()) {
-            ids.add(rs.getLong(1));
+         try(ResultSet rs = stmt.executeQuery()) {
+            while(rs.next()) {
+               ids.add(rs.getLong(1));
+            }
          }
          return ids;
-      } finally {
-         SQLUtil.closeQuietly(conn, stmt, rs);
       }
    }
 
@@ -2145,26 +2140,19 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public Term createTerm(final String name, final String slug) throws SQLException {
-
-      Connection conn = null;
-      PreparedStatement stmt = null;
-      ResultSet rs = null;
-      Timer.Context ctx = metrics.createTermTimer.time();
-      try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(insertTermSQL, Statement.RETURN_GENERATED_KEYS);
+      try(Connection conn = connectionSupplier.getConnection();
+          PreparedStatement stmt = conn.prepareStatement(insertTermSQL, Statement.RETURN_GENERATED_KEYS);
+          Timer.Context ignore = metrics.createTermTimer.time()) {
          stmt.setString(1, name);
          stmt.setString(2, slug);
          stmt.executeUpdate();
-         rs = stmt.getGeneratedKeys();
-         if(rs.next()) {
-            return new Term(rs.getLong(1), name, slug);
-         } else {
-            throw new SQLException("Problem creating term (no generated id)");
+         try(ResultSet rs = stmt.getGeneratedKeys()) {
+            if(rs.next()) {
+               return new Term(rs.getLong(1), name, slug);
+            } else {
+               throw new SQLException("Problem creating term (no generated id)");
+            }
          }
-      } finally {
-         ctx.stop();
-         closeQuietly(conn, stmt, rs);
       }
    }
 
@@ -2177,19 +2165,13 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public Term selectTerm(final long id) throws SQLException {
-      Connection conn = null;
-      PreparedStatement stmt = null;
-      ResultSet rs = null;
-      Timer.Context ctx = metrics.selectTermTimer.time();
-      try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(selectTermIdSQL);
+      try(Connection conn = connectionSupplier.getConnection();
+          PreparedStatement stmt = conn.prepareStatement(selectTermIdSQL);
+          Timer.Context ignore = metrics.selectTermTimer.time()) {
          stmt.setLong(1, id);
-         rs = stmt.executeQuery();
-         return rs.next() ? new Term(id, rs.getString(1), rs.getString(2)) : null;
-      } finally {
-         ctx.stop();
-         closeQuietly(conn, stmt, rs);
+         try(ResultSet rs = stmt.executeQuery()) {
+            return rs.next() ? new Term(id, rs.getString(1), rs.getString(2)) : null;
+         }
       }
    }
 
@@ -2220,7 +2202,7 @@ public class DB implements MetricSet {
    public List<Term> selectSlugTerms(final String slug) throws SQLException {
       try(Connection conn = connectionSupplier.getConnection();
           PreparedStatement stmt = conn.prepareStatement(selectTermSlugSQL);
-          Timer.Context ctx = metrics.selectTermTimer.time()) {
+          Timer.Context ignore = metrics.selectTermTimer.time()) {
          stmt.setString(1, slug);
          try(ResultSet rs = stmt.executeQuery()) {
             List<Term> terms = Lists.newArrayListWithExpectedSize(2);
@@ -2242,30 +2224,24 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public TaxonomyTerm selectTaxonomyTerm(final String taxonomy, final String name) throws SQLException {
-
-      Connection conn = null;
-      PreparedStatement stmt = null;
-      ResultSet rs = null;
       long taxonomyTermId = 0L;
       long termId = 0L;
       String description = "";
-      Timer.Context ctx = metrics.selectTaxonomyTermTimer.time();
-      try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(selectTaxonomyTermSQL);
+      try(
+         Connection conn = connectionSupplier.getConnection();
+         PreparedStatement stmt = conn.prepareStatement(selectTaxonomyTermSQL);
+         Timer.Context ignore = metrics.selectTaxonomyTermTimer.time()) {
          stmt.setString(1, name);
          stmt.setString(2, taxonomy);
-         rs = stmt.executeQuery();
-         if(rs.next()) {
-            taxonomyTermId = rs.getLong(1);
-            termId = rs.getLong(2);
-            description = rs.getString(3);
-         } else {
-            return null;
+         try(ResultSet rs = stmt.executeQuery()) {
+            if(rs.next()) {
+               taxonomyTermId = rs.getLong(1);
+               termId = rs.getLong(2);
+               description = rs.getString(3);
+            } else {
+               return null;
+            }
          }
-      } finally {
-         ctx.stop();
-         closeQuietly(conn, stmt, rs);
       }
       return new TaxonomyTerm(taxonomyTermId, taxonomy, selectTerm(termId), description);
    }
@@ -2288,22 +2264,15 @@ public class DB implements MetricSet {
          return false;
       }
 
-      Connection conn = null;
-      PreparedStatement stmt = null;
-      Timer.Context ctx = metrics.updateTaxonomyTermTimer.time();
-      try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(updateTaxonomyTermDescriptionSQL);
+      try(Connection conn = connectionSupplier.getConnection();
+         PreparedStatement stmt = conn.prepareStatement(updateTaxonomyTermDescriptionSQL);
+         Timer.Context ignore = metrics.updateTaxonomyTermTimer.time()) {
          stmt.setString(1, Strings.nullToEmpty(description));
          stmt.setLong(2, term.term.id);
          stmt.setString(3, taxonomy);
          return stmt.executeUpdate() > 0;
-      } finally {
-         ctx.stop();
-         closeQuietly(conn, stmt);
       }
    }
-
 
    final String insertTaxonomyTermSQL;
 
@@ -2319,27 +2288,20 @@ public class DB implements MetricSet {
    public TaxonomyTerm createTaxonomyTerm(final String taxonomy, final String name, final String slug,
                                           final String description) throws SQLException {
       Term term = createTerm(name, slug);
-
-      Connection conn = null;
-      PreparedStatement stmt = null;
-      ResultSet rs = null;
-      Timer.Context ctx = metrics.createTaxonomyTermTimer.time();
-      try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(insertTaxonomyTermSQL, Statement.RETURN_GENERATED_KEYS);
+      try(Connection conn = connectionSupplier.getConnection();
+          PreparedStatement stmt = conn.prepareStatement(insertTaxonomyTermSQL, Statement.RETURN_GENERATED_KEYS);
+          Timer.Context ignore = metrics.createTaxonomyTermTimer.time()) {
          stmt.setLong(1, term.id);
          stmt.setString(2, taxonomy);
          stmt.setString(3, Strings.nullToEmpty(description));
          stmt.executeUpdate();
-         rs = stmt.getGeneratedKeys();
-         if(rs.next()) {
-            return new TaxonomyTerm(rs.getLong(1), taxonomy, term, description);
-         } else {
-            throw new SQLException("Problem creating taxonomy term (no generated id)");
+         try(ResultSet rs = stmt.getGeneratedKeys()) {
+            if(rs.next()) {
+               return new TaxonomyTerm(rs.getLong(1), taxonomy, term, description);
+            } else {
+               throw new SQLException("Problem creating taxonomy term (no generated id)");
+            }
          }
-      } finally {
-         ctx.stop();
-         closeQuietly(conn, stmt, rs);
       }
    }
 
@@ -2418,36 +2380,28 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public TaxonomyTerm resolveTaxonomyTerm(final long id) throws SQLException {
-
       metrics.taxonomyTermCacheTries.mark();
       TaxonomyTerm term = taxonomyTermCache.getIfPresent(id);
       if(term != null) {
          metrics.taxonomyTermCacheHits.mark();
          return term;
       }
-
-      Connection conn = null;
-      PreparedStatement stmt = null;
-      ResultSet rs = null;
       long termId = 0;
       String taxonomy = "";
       String description = "";
-      Timer.Context ctx = metrics.taxonomyTermResolveTimer.time();
-      try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(selectTaxonomyTermIdSQL);
+      try(
+         Connection conn = connectionSupplier.getConnection();
+         PreparedStatement stmt = conn.prepareStatement(selectTaxonomyTermIdSQL);
+         Timer.Context ctx = metrics.taxonomyTermResolveTimer.time()) {
          stmt.setLong(1, id);
-         rs = stmt.executeQuery();
-         if(rs.next()) {
-            taxonomy = rs.getString(1);
-            termId = rs.getLong(2);
-            description = rs.getString(3);
+         try(ResultSet rs = stmt.executeQuery()) {
+            if(rs.next()) {
+               taxonomy = rs.getString(1);
+               termId = rs.getLong(2);
+               description = rs.getString(3);
+            }
          }
-      } finally {
-         ctx.stop();
-         SQLUtil.closeQuietly(conn, stmt, rs);
       }
-
       if(termId > 0) {
          term = new TaxonomyTerm(id, taxonomy, selectTerm(termId), description);
          taxonomyTermCache.put(id, term);
@@ -2466,18 +2420,12 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public void clearPostTerm(final long postId, final long taxonomyTermId) throws SQLException {
-      Connection conn = null;
-      PreparedStatement stmt = null;
-      Timer.Context ctx = metrics.postTermsClearTimer.time();
-      try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(clearPostTermSQL);
+      try(Connection conn = connectionSupplier.getConnection();
+          PreparedStatement stmt = conn.prepareStatement(clearPostTermSQL);
+          Timer.Context ctx = metrics.postTermsClearTimer.time()) {
          stmt.setLong(1, postId);
          stmt.setLong(2, taxonomyTermId);
          stmt.executeUpdate();
-      } finally {
-         ctx.stop();
-         SQLUtil.closeQuietly(conn, stmt);
       }
    }
 
@@ -2489,17 +2437,11 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public void clearPostTerms(final long postId) throws SQLException {
-      Connection conn = null;
-      PreparedStatement stmt = null;
-      Timer.Context ctx = metrics.postTermsClearTimer.time();
-      try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(clearPostTermsSQL);
+      try(Connection conn = connectionSupplier.getConnection();
+          PreparedStatement stmt = conn.prepareStatement(clearPostTermsSQL);
+          Timer.Context ctx = metrics.postTermsClearTimer.time()) {
          stmt.setLong(1, postId);
          stmt.executeUpdate();
-      } finally {
-         ctx.stop();
-         SQLUtil.closeQuietly(conn, stmt);
       }
    }
 
@@ -2535,19 +2477,13 @@ public class DB implements MetricSet {
          }
       }
 
-      Connection conn = null;
-      PreparedStatement stmt = null;
-      Timer.Context ctx = metrics.postTermsSetTimer.time();
-      try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(insertPostTermSQL);
+      try(Connection conn = connectionSupplier.getConnection();
+          PreparedStatement stmt = conn.prepareStatement(insertPostTermSQL);
+          Timer.Context ignore = metrics.postTermsSetTimer.time()) {
          stmt.setLong(1, postId);
          stmt.setLong(2, taxonomyTerm.id);
          stmt.setInt(3, currTerms.size()); //Add at the last position...
          return stmt.executeUpdate() > 0;
-      } finally {
-         ctx.stop();
-         SQLUtil.closeQuietly(conn, stmt);
       }
    }
 
@@ -2565,7 +2501,7 @@ public class DB implements MetricSet {
     */
    public List<TaxonomyTerm> setPostTerms(final long postId, final String taxonomy, final List<String> terms) throws SQLException {
       clearPostTerms(postId, taxonomy);
-      if(terms == null || terms.size() == 0) {
+      if(terms == null || terms.isEmpty()) {
          return ImmutableList.of();
       }
 
@@ -2574,12 +2510,9 @@ public class DB implements MetricSet {
          taxonomyTerms.add(resolveTaxonomyTerm(taxonomy, term, ""));
       }
 
-      Connection conn = null;
-      PreparedStatement stmt = null;
-      Timer.Context ctx = metrics.postTermsSetTimer.time();
-      try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(insertPostTermSQL);
+      try(Connection conn = connectionSupplier.getConnection();
+          PreparedStatement stmt = conn.prepareStatement(insertPostTermSQL);
+          Timer.Context ignore = metrics.postTermsSetTimer.time()) {
          int pos = 0;
          for(TaxonomyTerm taxonomyTerm : taxonomyTerms) {
             stmt.setLong(1, postId);
@@ -2587,11 +2520,7 @@ public class DB implements MetricSet {
             stmt.setInt(3, pos++);
             stmt.executeUpdate();
          }
-      } finally {
-         ctx.stop();
-         SQLUtil.closeQuietly(conn, stmt);
       }
-
       return taxonomyTerms;
    }
 
@@ -2607,7 +2536,6 @@ public class DB implements MetricSet {
       return selectPostTerms(postId, null);
    }
 
-
    /**
     * Selects all terms associated with a post.
     * @param postId The post id.
@@ -2616,25 +2544,19 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public List<TaxonomyTerm> selectPostTerms(final long postId, final String taxonomy) throws SQLException {
-      Connection conn = null;
-      PreparedStatement stmt = null;
-      ResultSet rs = null;
       List<Long> termIds = Lists.newArrayListWithExpectedSize(8);
-      Timer.Context ctx = metrics.postTermsSelectTimer.time();
-      try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(selectPostTermsSQL);
+      try (Connection conn = connectionSupplier.getConnection();
+           PreparedStatement stmt = conn.prepareStatement(selectPostTermsSQL);
+           Timer.Context ignore = metrics.postTermsSelectTimer.time()) {
          stmt.setLong(1, postId);
-         rs = stmt.executeQuery();
-         while(rs.next()) {
-            termIds.add(rs.getLong(1));
+         try(ResultSet rs = stmt.executeQuery()) {
+            while(rs.next()) {
+               termIds.add(rs.getLong(1));
+            }
          }
-      } finally {
-         ctx.stop();
-         SQLUtil.closeQuietly(conn, stmt, rs);
       }
 
-      if(termIds.size() == 0) {
+      if(termIds.isEmpty()) {
          return ImmutableList.of();
       }
 
@@ -2669,24 +2591,18 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public String selectOption(final String optionName, final String defaultValue) throws SQLException {
-      Connection conn = null;
-      PreparedStatement stmt = null;
-      ResultSet rs = null;
-      Timer.Context ctx = metrics.optionSelectTimer.time();
-      try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(selectOptionSQL);
+      try (Connection conn = connectionSupplier.getConnection();
+           PreparedStatement stmt = conn.prepareStatement(selectOptionSQL);
+           Timer.Context ignore = metrics.optionSelectTimer.time()) {
          stmt.setString(1, optionName);
-         rs = stmt.executeQuery();
-         if(rs.next()) {
-            String val = rs.getString(1);
-            return val != null ? val.trim() : defaultValue;
-         } else {
-            return defaultValue;
+         try(ResultSet rs = stmt.executeQuery()) {
+            if(rs.next()) {
+               String val = rs.getString(1);
+               return val != null ? val.trim() : defaultValue;
+            } else {
+               return defaultValue;
+            }
          }
-      } finally {
-         ctx.stop();
-         SQLUtil.closeQuietly(conn, stmt, rs);
       }
    }
 
@@ -2746,24 +2662,16 @@ public class DB implements MetricSet {
     * @throws SQLException on database error.
     */
    public List<Blog> selectPublicBlogs() throws SQLException {
-
-      Connection conn = null;
-      PreparedStatement stmt = null;
-      ResultSet rs = null;
       List<Blog> blogs = Lists.newArrayListWithExpectedSize(4);
-      Timer.Context ctx = metrics.selectBlogsTimer.time();
-      try {
-         conn = connectionSupplier.getConnection();
-         stmt = conn.prepareStatement(selectPublicBlogsSQL);
-         rs = stmt.executeQuery();
-         while(rs.next()) {
-            blogs.add(blogFromResultSet(rs));
+      try (Connection conn = connectionSupplier.getConnection();
+           PreparedStatement stmt = conn.prepareStatement(selectPublicBlogsSQL);
+           Timer.Context ignore = metrics.selectBlogsTimer.time()) {
+         try(ResultSet rs = stmt.executeQuery()) {
+            while(rs.next()) {
+               blogs.add(blogFromResultSet(rs));
+            }
          }
-      } finally {
-         ctx.stop();
-         SQLUtil.closeQuietly(conn, stmt, rs);
       }
-
       return blogs;
    }
 
